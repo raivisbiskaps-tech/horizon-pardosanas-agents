@@ -10,6 +10,7 @@ Lietošana:
 """
 
 import os
+import sys
 import chromadb
 from chromadb.utils import embedding_functions
 import anthropic
@@ -17,6 +18,17 @@ import streamlit as st
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+@st.cache_resource(show_spinner="Indeksē dokumentāciju, lūdzu uzgaidi...")
+def auto_ingest():
+    """Automātiski palaiž indeksēšanu, ja chroma_db nav atrasta."""
+    if not os.path.exists(CHROMA_DIR):
+        # Pievieno projekta mapi Python ceļam
+        sys.path.insert(0, os.path.dirname(__file__))
+        from ingest import ingest
+        ingest()
+    return True
 
 # ── Konfigurācija ────────────────────────────────────────────────────────────
 
@@ -151,6 +163,9 @@ def main():
         img_path = os.path.join(os.path.dirname(__file__), "assets", "horizon.jpg")
         if os.path.exists(img_path):
             st.image(img_path, use_container_width=True)
+
+    # Automātiski indeksē, ja nepieciešams
+    auto_ingest()
 
     # Ielādē resursus
     collection = load_collection()
