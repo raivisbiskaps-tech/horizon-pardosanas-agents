@@ -13,7 +13,7 @@ import os
 import sys
 import chromadb
 from chromadb.utils import embedding_functions
-import anthropic
+from mistralai import Mistral
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -38,8 +38,8 @@ COLLECTION_NAME = "dokumentacija"
 # Cik relevantu fragmentu iegūt no ChromaDB
 TOP_K_RESULTS = 5
 
-# Claude modelis
-CLAUDE_MODEL = "claude-sonnet-4-6"
+# Mistral modelis
+MISTRAL_MODEL = "mistral-large-latest"
 
 # Sistēmas uzvedne — nosaka Claude uzvedību
 SYSTEM_PROMPT = """Tu esi lietotāju atbalsta asistents, kas atbild uz jautājumiem \
@@ -84,13 +84,13 @@ def load_collection():
 
 
 @st.cache_resource
-def load_claude_client():
-    """Inicializē Anthropic klientu."""
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+def load_mistral_client():
+    """Inicializē Mistral klientu."""
+    api_key = os.getenv("MISTRAL_API_KEY")
     if not api_key:
-        st.error("❌ ANTHROPIC_API_KEY nav iestatīts .env failā.")
+        st.error("❌ MISTRAL_API_KEY nav iestatīts .env failā.")
         st.stop()
-    return anthropic.Anthropic(api_key=api_key)
+    return Mistral(api_key=api_key)
 
 
 # ── RAG funkcija ──────────────────────────────────────────────────────────────
@@ -124,8 +124,8 @@ def retrieve_context(collection, question: str) -> tuple[str, list[str]]:
     return "\n\n---\n\n".join(context_parts), sources
 
 
-def ask_claude(client, question: str, context: str) -> str:
-    """Nosūta jautājumu un kontekstu uz Claude API."""
+def ask_mistral(client, question: str, context: str) -> str:
+    """Nosūta jautājumu un kontekstu uz Mistral API."""
     user_message = f"""Dokumentācija:
 {context}
 
@@ -133,13 +133,14 @@ def ask_claude(client, question: str, context: str) -> str:
 
 Jautājums: {question}"""
 
-    response = client.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=1024,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_message}],
+    response = client.chat.complete(
+        model=MISTRAL_MODEL,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
     )
-    return response.content[0].text
+    return response.choices[0].message.content
 
 
 # ── Streamlit UI ──────────────────────────────────────────────────────────────
@@ -169,7 +170,7 @@ def main():
 
     # Ielādē resursus
     collection = load_collection()
-    claude_client = load_claude_client()
+    mistral_client = load_mistral_client()
 
     # Inicializē čata vēsturi
     if "messages" not in st.session_state:
@@ -201,7 +202,7 @@ def main():
                     answer = "Šī informācija nav pieejama dokumentācijā."
                     sources = []
                 else:
-                    answer = ask_claude(claude_client, question, context)
+                    answer = ask_mistral(mistral_client, question, context)
 
             st.markdown(answer)
 
@@ -231,7 +232,7 @@ def main():
             st.rerun()
 
         st.divider()
-        st.caption("Darbināts ar Claude AI")
+        st.caption("Darbināts ar Mistral AI")
 
 
 if __name__ == "__main__":
