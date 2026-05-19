@@ -146,26 +146,26 @@ def main():
         layout="wide",
     )
 
-    # CSS — iesaldēts header un scrollējams čats
+    # CSS — lapa bez scrollbar, čats aizpilda atlikušo augstumu
     st.markdown("""
     <style>
-        /* Paslēpj Streamlit noklusējuma padding */
-        .block-container { padding-top: 1rem !important; }
-
-        /* Iesaldētais header */
-        .fixed-header {
-            position: sticky;
-            top: 0;
-            z-index: 999;
-            background-color: white;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid #e0e0e0;
+        /* Noņem lapas padding */
+        .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 0 !important;
+            max-width: 100% !important;
+        }
+        /* Paslēpj lapas scrollbar */
+        html, body { overflow: hidden; }
+        /* Šķirtne zem headera */
+        .header-divider {
+            border-bottom: 2px solid #003087;
+            margin-bottom: 0.8rem;
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # ── Iesaldētais header ────────────────────────────────────────────────────
-    st.markdown('<div class="fixed-header">', unsafe_allow_html=True)
+    # ── Header ────────────────────────────────────────────────────────────────
     col_logo, col_title, col_img = st.columns([1, 3, 1])
     with col_logo:
         logo_path = os.path.join(BASE_DIR, "assets", "logo.jpg")
@@ -177,18 +177,19 @@ def main():
         img_path = os.path.join(BASE_DIR, "assets", "Horizon.jpg")
         if os.path.exists(img_path):
             st.image(img_path, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="header-divider"></div>', unsafe_allow_html=True)
 
     # Indeksē un ielādē resursus
     auto_ingest()
     collection     = load_collection()
     mistral_client = load_mistral_client()
 
-    # ── Scrollējamais čata bloks ──────────────────────────────────────────────
+    # ── Scrollējamais čata bloks ar savu scrollbar ────────────────────────────
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    chat_container = st.container(height=500, border=False)
+    chat_container = st.container(height=520, border=True)
     with chat_container:
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]):
@@ -198,7 +199,7 @@ def main():
                         for src in msg["sources"]:
                             st.text(f"• {src}")
 
-    # ── Jautājuma ievade (vienmēr apakšā) ────────────────────────────────────
+    # ── Jautājuma ievade ──────────────────────────────────────────────────────
     if question := st.chat_input("Uzraksti jautājumu..."):
         st.session_state.messages.append({"role": "user", "content": question})
 
