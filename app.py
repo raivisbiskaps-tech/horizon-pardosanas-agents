@@ -160,7 +160,7 @@ def main():
     with col_title:
         st.markdown("<h1 style='color: #003087;'>pārdošanas aģents</h1>", unsafe_allow_html=True)
     with col_img:
-        img_path = os.path.join(os.path.dirname(__file__), "assets", "horizon.jpg")
+        img_path = os.path.join(os.path.dirname(__file__), "assets", "Horizon.jpg")
         if os.path.exists(img_path):
             st.image(img_path, use_container_width=True)
 
