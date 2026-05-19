@@ -23,22 +23,25 @@ COLLECTION_NAME = "dokumentacija"
 TOP_K_RESULTS   = 8
 MISTRAL_MODEL   = "mistral-large-latest"
 
-SYSTEM_PROMPT = """Tu esi Horizon pārdošanas aģents. Izplatām, izstrādājam un ieviešam ERP Horizon. \
-Tava uzdevums ir sniegt atbildes uz potenciālo klientu jautājumiem, balstoties uz pievienoto informāciju.
+SYSTEM_PROMPT = """Tu esi Horizon pārdošanas aģents. Izplatām, izstrādājam un ieviešam ERP Horizon.
+Tava uzdevums ir sniegt atbildes uz potenciālo klientu jautājumiem.
 
-Svarīgi konteksts:
-- Jautājumus uzdod potenciāls Horizon klients, kuram nav precīzu zināšanu par Horizon
+SVARĪGI — ZINĀŠANU AVOTS:
+Tev ir pieejami TIKAI zemāk sniegtie dokumentu fragmenti. Tie ir VIENĪGAIS avots, no kura drīkst atbildēt.
+Tev NAV atļauts izmantot savas vispārīgās zināšanas par ERP sistēmām vai jebko citu ārpus šiem fragmentiem.
+
+Konteksts par klientu:
+- Jautājumus uzdod potenciāls klients bez Horizon zināšanām
 - Klients neorientējas Horizon struktūrā un terminoloģijā
-- Tāpēc atbildes sniedz saprotamā, klientam draudzīgā valodā
+- Atbildes sniedz saprotamā, klientam draudzīgā valodā
 
-Noteikumi:
-- Atbildes sniedz precīzas, bez plaša izvērsuma un interpretācijām
-- Atbildes sniedz TIKAI balstoties uz pievienotajiem resursiem
-- Neiekļauj datus no vispārīgajām zināšanām — atbildi tikai no pievienotajiem failiem
-- Ja atbilde failos nav — veic vēlreiz rūpīgu meklēšanu dokumentu fragmentos pirms atbildes
-- Ja uz jautājumu nevar sniegt precīzu atbildi — uzdod pretjautājumus, kas precizē jautājumu
-- Neatsaucies uz iepriekšējām sarakstēm
-- Atbildi tajā pašā valodā, kurā tiek uzdots jautājums"""
+Stingri noteikumi:
+1. Atbildi TIKAI ar informāciju, kas ir tieši atrodama sniegtajos fragmentos
+2. Ja atbilde nav fragmentos — atbildi: "Šī informācija nav pieejama mūsu dokumentācijā."
+3. AIZLIEGTS izdomāt, papildināt vai interpretēt informāciju ārpus fragmentiem
+4. Ja jautājums ir neskaidrs — uzdod precizējošu pretjautājumu
+5. Neatsaucies uz iepriekšējām sarakstēm
+6. Atbildi tajā pašā valodā, kurā tiek uzdots jautājums"""
 
 
 # ── Indeksēšana ───────────────────────────────────────────────────────────────
@@ -113,11 +116,22 @@ def retrieve_context(collection, question: str) -> tuple[str, list[str]]:
 
 def ask_mistral(client, question: str, context: str) -> str:
     """Nosūta jautājumu un kontekstu uz Mistral API."""
+    user_message = f"""Zemāk ir VIENĪGIE dokumentu fragmenti, ko drīksti izmantot atbildē.
+Ja atbilde nav šajos fragmentos — nekādā gadījumā to neizdomā.
+
+=== DOKUMENTU FRAGMENTI (VIENĪGAIS AVOTS) ===
+{context}
+=== FRAGMENTU BEIGAS ===
+
+Jautājums: {question}
+
+Atceries: atbildi TIKAI no iepriekš sniegtajiem fragmentiem. Ja informācija tur nav — saki to tieši."""
+
     response = client.chat.completions.create(
         model=MISTRAL_MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Dokumentācija:\n{context}\n\n---\n\nJautājums: {question}"},
+            {"role": "user", "content": user_message},
         ],
     )
     return response.choices[0].message.content
