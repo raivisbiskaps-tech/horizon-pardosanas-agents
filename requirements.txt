@@ -1,5 +1,5 @@
-# Mistral API
-mistralai>=1.0.0
+# Mistral API (caur OpenAI-saderīgo klientu)
+openai>=1.0.0
 
 # Vektoru datubāze
 chromadb>=0.5.0
@@ -19,4 +19,3 @@ markdown>=3.6
 streamlit>=1.40.0
 
 # Vides mainīgie
-python-dotenv>=1.0.0

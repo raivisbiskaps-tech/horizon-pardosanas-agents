@@ -13,7 +13,7 @@ import os
 import sys
 import chromadb
 from chromadb.utils import embedding_functions
-from mistralai import Mistral
+from openai import OpenAI
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -85,12 +85,15 @@ def load_collection():
 
 @st.cache_resource
 def load_mistral_client():
-    """Inicializē Mistral klientu."""
+    """Inicializē Mistral klientu caur OpenAI-saderīgo API."""
     api_key = os.getenv("MISTRAL_API_KEY")
     if not api_key:
         st.error("❌ MISTRAL_API_KEY nav iestatīts .env failā.")
         st.stop()
-    return Mistral(api_key=api_key)
+    return OpenAI(
+        api_key=api_key,
+        base_url="https://api.mistral.ai/v1",
+    )
 
 
 # ── RAG funkcija ──────────────────────────────────────────────────────────────
@@ -133,7 +136,7 @@ def ask_mistral(client, question: str, context: str) -> str:
 
 Jautājums: {question}"""
 
-    response = client.chat.complete(
+    response = client.chat.completions.create(
         model=MISTRAL_MODEL,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -225,15 +228,4 @@ def main():
             count = collection.count()
             st.metric("Indeksēti fragmenti", count)
         except Exception:
-            pass
-
-        if st.button("🗑️ Notīrīt čatu"):
-            st.session_state.messages = []
-            st.rerun()
-
-        st.divider()
-        st.caption("Darbināts ar Mistral AI")
-
-
-if __name__ == "__main__":
-    main()
+            pas
