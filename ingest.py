@@ -24,6 +24,7 @@ from docx import Document as DocxDocument
 import pandas as pd
 from bs4 import BeautifulSoup
 import markdown
+import requests
 
 # Vektoru datubāze
 import chromadb
@@ -97,10 +98,28 @@ def extract_html(filepath: Path) -> str:
     with open(filepath, "r", encoding="utf-8") as f:
         html = f.read()
     soup = BeautifulSoup(html, "html.parser")
-    # Izņem skriptus un stilus
     for tag in soup(["script", "style", "nav", "footer"]):
         tag.decompose()
     return soup.get_text(separator="\n")
+
+
+def extract_url(url: str) -> str | None:
+    """Iegūst tekstu no web lapas pēc URL."""
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; DocBot/1.0)"}
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        # Izņem skriptus, stilus, navigāciju un footer
+        for tag in soup(["script", "style", "nav", "footer", "header"]):
+            tag.decompose()
+        text = soup.get_text(separator="\n")
+        # Notīra tukšas rindas
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        return "\n".join(lines)
+    except Exception as e:
+        print(f"  ❌ Nevarēja ielādēt {url}: {e}")
+        return None
 
 
 def extract_text(filepath: Path) -> str | None:
@@ -201,6 +220,23 @@ def ingest(docs_dir: str = DOCS_DIR):
     doc_files = [f for f in files if f.is_file()]
 
     print(f"📂 Atrasti {len(doc_files)} faili mapē '{docs_dir}'\n")
+
+    # Apstrādā URL sarakstu (urls.txt), ja eksistē
+    urls_file = Path(os.path.dirname(os.path.abspath(__file__))) / "urls.txt"
+    if urls_file.exists():
+        urls = [u.strip() for u in urls_file.read_text(encoding="utf-8").splitlines()
+                if u.strip() and not u.startswith("#")]
+        print(f"🌐 Atrasti {len(urls)} URL adreses urls.txt failā\n")
+        for url in urls:
+            print(f"🌍 Ielādē: {url}")
+            text = extract_url(url)
+            if not text or len(text.strip()) < 50:
+                print(f"  ⚠️  Saturs nav atrasts vai pārāk īss, izlaižam.\n")
+                continue
+            source = url
+            chunks = split_into_chunks(text, source=source)
+            print(f"  ✅ {len(chunks)} gabali\n")
+            all_chunks.extend(chunks)
 
     for filepath in doc_files:
         print(f"📄 Apstrādā: {filepath.name}")

@@ -1,0 +1,25 @@
+# URL saraksts — katrs URL jaunā rindā
+# Rindas, kas sākas ar #, tiek ignorētas
+#
+# Piemēri:
+# https://example.com/dokumentacija/lapa1
+# https://example.com/par-produktu
+https://www.horizon.lv/
+https://www.horizon.lv/pamatsistema
+https://www.horizon.lv/gramatvediba
+https://www.horizon.lv/personals
+https://www.horizon.lv/bizness
+https://www.horizon.lv/papildinajumi
+https://www.horizon.lv/integretie-risinajumi
+https://www.horizon.lv/atsauksmes
+https://www.horizon.lv/nozares/tirdznieciba
+https://www.horizon.lv/atsauksmes/pakalpojumi
+https://www.horizon.lv/atsauksmes/razosana
+https://www.horizon.lv/atsauksmes/gramatvedibas-arpakalpojumi
+https://www.horizon.lv/atsauksmes/buvnieciba
+https://www.horizon.lv/atsauksmes/veselibas-aprupe
+https://www.horizon.lv/atsauksmes/apsaimniekosana
+https://www.horizon.lv/atsauksmes/publiskais-sektors
+https://www.horizon.lv/izmaksas#horizon-abonesana
+https://www.horizon.lv/ieviesana
+https://www.horizon.lv/par-mums
