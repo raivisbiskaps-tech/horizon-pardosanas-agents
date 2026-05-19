@@ -38,11 +38,10 @@ Noteikumi:
 
 @st.cache_resource(show_spinner="Indeksē dokumentāciju, lūdzu uzgaidi...")
 def auto_ingest():
-    """Automātiski palaiž indeksēšanu, ja chroma_db nav atrasta."""
-    if not os.path.exists(CHROMA_DIR):
-        sys.path.insert(0, BASE_DIR)
-        from ingest import ingest
-        ingest(docs_dir=DOCS_DIR)
+    """Indeksē dokumentus pie katras jaunas sesijas."""
+    sys.path.insert(0, BASE_DIR)
+    from ingest import ingest
+    ingest(docs_dir=DOCS_DIR)
     return True
 
 
@@ -192,6 +191,9 @@ def main():
             pass
         if st.button("🗑️ Notīrīt čatu"):
             st.session_state.messages = []
+            st.rerun()
+        if st.button("🔄 Pārindeksēt dokumentus"):
+            st.cache_resource.clear()
             st.rerun()
         st.divider()
         st.caption("Darbināts ar Mistral AI")
