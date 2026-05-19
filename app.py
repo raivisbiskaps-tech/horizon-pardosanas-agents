@@ -20,17 +20,19 @@ BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 CHROMA_DIR   = os.path.join(BASE_DIR, "chroma_db")
 DOCS_DIR     = os.path.join(BASE_DIR, "docs")
 COLLECTION_NAME = "dokumentacija"
-TOP_K_RESULTS   = 5
+TOP_K_RESULTS   = 8
 MISTRAL_MODEL   = "mistral-large-latest"
 
-SYSTEM_PROMPT = """Tu esi lietotāju atbalsta asistents, kas atbild uz jautājumiem \
-balstoties TIKAI uz sniegto dokumentāciju.
+SYSTEM_PROMPT = """Tu esi pieredzējis lietotāju atbalsta asistents, kas sniedz detalizētas \
+un noderīgas atbildes, balstoties uz sniegto dokumentāciju.
 
 Noteikumi:
-- Atbildi precīzi un kodolīgi
+- Sniedz pilnīgas, detalizētas atbildes — neaprobežojies ar vienu teikumu
+- Ja jautājums ietver vairākus aspektus, apskati katru no tiem
+- Izmanto konkrētus piemērus un soļus no dokumentācijas, ja tie ir pieejami
 - Ja atbilde nav atrodama dokumentācijā, atbildi: "Šī informācija nav pieejama dokumentācijā."
 - Nekad neizdomā informāciju, ko neatrodi dokumentos
-- Ja jautājums ir neskaidrs, lūdz precizējumu
+- Ja jautājums ir neskaidrs, vispirms sniedz atbildi uz to, ko saproti, tad lūdz precizējumu
 - Atbildi tajā pašā valodā, kurā tiek uzdots jautājums"""
 
 
@@ -59,7 +61,7 @@ def load_collection():
 
     client = chromadb.PersistentClient(path=CHROMA_DIR)
     emb_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="all-MiniLM-L6-v2"
+        model_name="paraphrase-multilingual-mpnet-base-v2"
     )
     try:
         return client.get_collection(name=COLLECTION_NAME, embedding_function=emb_fn)
@@ -96,7 +98,7 @@ def retrieve_context(collection, question: str) -> tuple[str, list[str]]:
         results["metadatas"][0],
         results["distances"][0],
     ):
-        if dist < 0.8:
+        if dist < 0.95:
             src = meta.get("source", "nezināms")
             context_parts.append(f"[Avots: {src}]\n{doc}")
             if src not in sources:

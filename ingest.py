@@ -179,7 +179,7 @@ def ingest(docs_dir: str = DOCS_DIR):
 
     # Embeddings — sentence-transformers (darbojas lokāli, bez API atslēgas)
     emb_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="all-MiniLM-L6-v2"
+        model_name="paraphrase-multilingual-mpnet-base-v2"
     )
 
     # Izdzēš veco kolekciju, ja eksistē (pilna pārindeksēšana)
