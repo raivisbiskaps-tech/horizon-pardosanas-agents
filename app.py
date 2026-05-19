@@ -146,7 +146,26 @@ def main():
         layout="wide",
     )
 
-    # Virsraksts ar logo un personas attēlu
+    # CSS — iesaldēts header un scrollējams čats
+    st.markdown("""
+    <style>
+        /* Paslēpj Streamlit noklusējuma padding */
+        .block-container { padding-top: 1rem !important; }
+
+        /* Iesaldētais header */
+        .fixed-header {
+            position: sticky;
+            top: 0;
+            z-index: 999;
+            background-color: white;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e0e0e0;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # ── Iesaldētais header ────────────────────────────────────────────────────
+    st.markdown('<div class="fixed-header">', unsafe_allow_html=True)
     col_logo, col_title, col_img = st.columns([1, 3, 1])
     with col_logo:
         logo_path = os.path.join(BASE_DIR, "assets", "logo.jpg")
@@ -158,50 +177,45 @@ def main():
         img_path = os.path.join(BASE_DIR, "assets", "Horizon.jpg")
         if os.path.exists(img_path):
             st.image(img_path, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # Indeksē un ielādē resursus
     auto_ingest()
     collection     = load_collection()
     mistral_client = load_mistral_client()
 
-    # Čata vēsture
+    # ── Scrollējamais čata bloks ──────────────────────────────────────────────
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-            if msg.get("sources"):
-                with st.expander("📎 Avoti"):
-                    for src in msg["sources"]:
-                        st.text(f"• {src}")
+    chat_container = st.container(height=500, border=False)
+    with chat_container:
+        for msg in st.session_state.messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+                if msg.get("sources"):
+                    with st.expander("📎 Avoti"):
+                        for src in msg["sources"]:
+                            st.text(f"• {src}")
 
-    # Jautājuma ievade
+    # ── Jautājuma ievade (vienmēr apakšā) ────────────────────────────────────
     if question := st.chat_input("Uzraksti jautājumu..."):
         st.session_state.messages.append({"role": "user", "content": question})
-        with st.chat_message("user"):
-            st.markdown(question)
 
-        with st.chat_message("assistant"):
-            with st.spinner("Meklē dokumentācijā..."):
-                context, sources = retrieve_context(collection, question)
-                if not context:
-                    answer  = "Šī informācija nav pieejama dokumentācijā."
-                    sources = []
-                else:
-                    answer = ask_mistral(mistral_client, question, context)
-
-            st.markdown(answer)
-            if sources:
-                with st.expander("📎 Avoti"):
-                    for src in sources:
-                        st.text(f"• {src}")
+        with st.spinner("Meklē dokumentācijā..."):
+            context, sources = retrieve_context(collection, question)
+            if not context:
+                answer  = "Šī informācija nav pieejama dokumentācijā."
+                sources = []
+            else:
+                answer = ask_mistral(mistral_client, question, context)
 
         st.session_state.messages.append({
             "role": "assistant",
             "content": answer,
             "sources": sources,
         })
+        st.rerun()
 
     # Sānjosla
     with st.sidebar:
