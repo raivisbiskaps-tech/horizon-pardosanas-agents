@@ -9,6 +9,7 @@ Lietošana:
 
 import os
 import sys
+import time
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -115,7 +116,7 @@ def retrieve_context(collection, question: str) -> tuple[str, list[str]]:
 
 
 def ask_mistral(client, question: str, context: str) -> str:
-    """Nosūta jautājumu un kontekstu uz Mistral API."""
+    """Nosūta jautājumu un kontekstu uz Mistral API ar atkārtošanas loģiku."""
     user_message = f"""Zemāk ir VIENĪGIE dokumentu fragmenti, ko drīksti izmantot atbildē.
 Ja atbilde nav šajos fragmentos — nekādā gadījumā to neizdomā.
 
@@ -127,14 +128,26 @@ Jautājums: {question}
 
 Atceries: atbildi TIKAI no iepriekš sniegtajiem fragmentiem. Ja informācija tur nav — saki to tieši."""
 
-    response = client.chat.completions.create(
-        model=MISTRAL_MODEL,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_message},
-        ],
-    )
-    return response.choices[0].message.content
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = client.chat.completions.create(
+                model=MISTRAL_MODEL,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_message},
+                ],
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            error_str = str(e).lower()
+            if "rate" in error_str or "limit" in error_str or "429" in error_str:
+                if attempt < max_retries - 1:
+                    wait = 5 * (attempt + 1)  # 5s, 10s, 15s
+                    time.sleep(wait)
+                    continue
+                return "⚠️ Sistēma šobrīd ir noslogota. Lūdzu, mēģini vēlreiz pēc dažām sekundēm."
+            raise
 
 
 # ── Streamlit UI ──────────────────────────────────────────────────────────────
