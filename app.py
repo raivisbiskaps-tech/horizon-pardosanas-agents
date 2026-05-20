@@ -22,7 +22,7 @@ CHROMA_DIR   = os.path.join(BASE_DIR, "chroma_db")
 DOCS_DIR     = os.path.join(BASE_DIR, "docs")
 COLLECTION_NAME = "dokumentacija"
 TOP_K_RESULTS   = 30
-MISTRAL_MODEL   = "mistral-large-2411"
+MISTRAL_MODEL   = "mistral-small-latest"
 
 SYSTEM_PROMPT = """Tu esi Horizon pārdošanas aģents. Izplatām, izstrādājam un ieviešam ERP Horizon.
 Tava uzdevums ir sniegt atbildes uz potenciālo klientu jautājumiem.
