@@ -67,19 +67,24 @@ def extract_docx(filepath: Path) -> str:
 
 
 def extract_excel(filepath: Path) -> str:
-    """Iegūst tekstu no Excel faila (visas lapas)."""
+    """Iegūst tekstu no Excel faila (visas lapas).
+    Katrai rindai pievieno kolonnu virsrakstus, lai meklēšana strādātu precīzāk.
+    """
     text_parts = []
     xl = pd.ExcelFile(str(filepath))
     for sheet_name in xl.sheet_names:
         df = xl.parse(sheet_name)
-        # Katru rindu pārvērš tekstā
+        # Notīra kolonnu nosaukumus
+        df.columns = [str(c).strip() for c in df.columns]
         text_parts.append(f"[Lapa: {sheet_name}]")
         for _, row in df.iterrows():
-            row_text = " | ".join(
-                str(v) for v in row.values if pd.notna(v) and str(v).strip()
-            )
-            if row_text:
-                text_parts.append(row_text)
+            # Formatē katru lauku kā "Kolonnas nosaukums: vērtība"
+            fields = []
+            for col, val in row.items():
+                if pd.notna(val) and str(val).strip():
+                    fields.append(f"{col}: {str(val).strip()}")
+            if fields:
+                text_parts.append(" | ".join(fields))
     return "\n".join(text_parts)
 
 
