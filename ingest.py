@@ -37,8 +37,9 @@ load_dotenv()
 
 # ── Konfigurācija ────────────────────────────────────────────────────────────
 
-DOCS_DIR = "./docs"          # Mape ar dokumentiem
-CHROMA_DIR = "./chroma_db"   # ChromaDB saglabāšanas vieta
+BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
+DOCS_DIR   = os.path.join(BASE_DIR, "docs")
+CHROMA_DIR = os.path.join(BASE_DIR, "chroma_db")
 COLLECTION_NAME = "dokumentacija"
 
 CHUNK_SIZE = 800             # Gabala lielums (simboli)
