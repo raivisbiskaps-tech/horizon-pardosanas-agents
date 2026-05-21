@@ -1,0 +1,725 @@
+ERP Horizon pārbaudīta vērtība Latvijas uzņēmumiem
+
+
+Par Horizon
+● Plaša funkcionalitāte dažādām uzņēmuma vajadzībām un integrāciju iespējas.
+● Latvijā ražota resursu vadības un grāmatvedības programma mākoņrisinājumā (rūpes par jūsu datu izmitināšanu uzņemas Visma). 
+● Pieejams ar Horizon integrēts darbinieku pašapkalpošanās portāls, ko lieto teju 1/4 Latvijas estrādājošo.
+
+Kāpēc izvēlēties Horizon?
+~23% strādājošo iedzīvotāju algas rēķina Horizon
+~40% strādājošo izmanto HoP
+12 000 vienlaicīgie Horizon lietotāji
+105 zinoši darbinieki Horizon atbalsta komandā
+Apmierināti klienti
+
+
+Horizon mākoņrisinājumā iekļauts programmas pamatsistēmas abonēšanā
+
+Mazākas izmaksas 
+Nav nepieciešams iegādāties serveri Horizon izmitināšanai un nodrošināt tā uzturēšanu.
+Atjauninājumi 
+Horizon atjauninājumi tiek piegādāti automātiski, neiesaistot IT personālu un netraucējot sistēmas lietotāju darbu.
+Datu drošība
+Augsti drošības standarti datu uzglabāšanai. Regulāra drošības kopiju veidošana un datu atjaunošanas pārbaude.
+
+
+Horizon 1400+ klienti pārstāv dažādas nozares
+
+
+Pamatsistēma
+Horizon pamatsistēmā iekļauts:
+   Grāmatvedība
+        Algas un Personāls
+  Noliktava
+● Virsgrāmata
+● Finanšu pārskati
+● Apgāde un realizācija
+● E-rēķini
+● Kase un banka
+● Nākamie periodi
+● Avansa norēķini
+● Pamatlīdzekļi 
+● Budžeta kontrole
+● Līgumu uzskaite
+Uzzināt vairāk »
+● Darba samaksa
+● Personāla uzskaite
+● Komandējumu uzskaite
+● HoP algas lapiņa darbiniekiem
+● Noliktavas uzskaite
+        Sistēmas pārvaldība
+● Atskaišu redaktors
+● Tiesības un lomas
+● Brīdinājumi
+● Daudzvalodas
+● Failu glabātuves
+● Saskaņošana
+● Vairāku uzņēmumu režīms
+● Automātiskie darbi
+● Excel spraudnis
+● Dokumentu imports/eksports
+● Paplašināta lietotāju pārvaldība
+● Kases aparāti
+
+Ieguvumi, izmantojot Horizon pamatsistēmu:
+Pielāgojumi un konfigurācija. 
+Lietotājs var pats veidot savu darba vidi: 
+izskatu, uzstādījumus, filtrus.
+Integrētas algas un personāls. Efektīvi 
+procesi starp grāmatvedību un personāla 
+nodaļu, vienoti dati. 
+Uzzināt vairāk »
+Savienojamība ar ikdienas rīkiem. Datu 
+imports un eksports MS Excel, Word, 
+e-pastu izsūtīšana, VID EDS atskaites u.c.
+Operatīva normatīvo regulējumu 
+ieviešana. Vienmēr nodrošināta atbilstība LR 
+likumdošanai, piemēram, e-rēķini Horizon 
+pieejami jau kopš 2019. gada.
+Viegla ievadītās informācijas labošana - 
+rēķini, pavadzīmes, maksājumi, algu 
+dokumenti u.c. 
+Datu padziļināta apskate (drill-down). Ērta 
+piekļuve ar dokumentu saistītajai informācijai sev 
+vēlamajā detalizācijā.
+Ērta failu glabāšana un apskate - 
+rēķiniem, līgumiem, darbinieku 
+dokumentiem u.c.
+Iebūvēts dokumentu un atskaišu 
+redaktors. Lietotājs var pats veidot savas 
+izdruku veidnes. 
+1 2 3
+4 5 6
+Normatīvā
+regulējuma izmaiņas
+Ekspertu komanda, kas ikdienā seko 
+līdzi likumdošanas izmaiņām. 
+Pieejamas VID obligāti iesniedzamās 
+atskaites. 
+Pielāgojamība 
+organizācijai
+Horizon ir plašas konfigurācijas 
+iespējas, nodrošinot konkrētā 
+uzņēmuma vajadzībām atbilstoša 
+risinājuma izveidi. Algu aprēķinu var 
+pielāgot organizācijas specifikajām 
+vajadzībām.  
+Automatizēta datu 
+apmaiņa
+Efektīvākam grāmatvežu darbam, 
+nodrošinātas automatizācijas 
+iespējas - atskaišu eksports uz VID 
+EDS un CSP. Horizon pieejams arī 
+izmaksu sarakstu eksports uz 
+bankām.
+Precīzs un operatīvs 
+algu aprēķins
+Integrācija ar personāla uzskaiti 
+vienotam algu un personāla 
+procesam, kas nodrošina visu darba 
+samaksas aprēķinam nepieciešamo 
+informāciju. Strādājot ar datiem vienā 
+sistēmā, tiek novērstas kļūdas, kas 
+rodas ievadot līdzīgu informāciju 
+vairākās sistēmās vai pazaudējot 
+dokumentus.
+Atskaites dažādos griezumos
+Atskaišu veidošana dažādos 
+griezumos un periodos. Iespējama 
+datu nosūtīšana uz Excel tālākai datu 
+apstrādei. Piemēram, darbinieku 
+skaits pēc līgumu veida, darba stāža, 
+dzimuma, vecuma vai tamlīdzīgi.
+Horizon Algas un Personāls
+Vairāki nodokļu maksātāji 
+vienā datu apgabalā
+Visu uzņēmumu dati vienā datu apgabalā, katram 
+dokumentam norādot tā saistību ar konkrētu uzņēmumu.
+Datu ievade, lietotājam nepārslēdzoties starp uzņēmumiem.
+Konsolidēto pārskatu  iegūšana par vairākiem 
+uzņēmumiem.
+Vienoti klasifikatori (klienti, preces, kontu plāns u.c.) visiem 
+uzņēmumiem.
+Ērta savstarpējo darījumu dokumentu ģenerēšana.
+Lietotājiem pieejamo datu nodalīšana pa dažādiem 
+uzņēmumiem.
+Neierobežots juridisko personu skaits.
+Vairākas nodalītas 
+firmas
+Katram uzņēmumam nodalīts datu apgabals.
+Datu ievadei nepieciešams pieslēgties konkrētā uzņēmuma 
+datubāzei.
+Konsolidētos pārskatus jāveido ārpus sistēmas.
+Katrā uzņēmumā nodalīti klasifikatori un konfigurācija.
+Nav iespējama savstarpējo darījumu automātiska 
+ģenerēšana.
+Iespēja lietotājiem definēt pieejas tiesības katrā no 
+uzņēmumiem.
+Neierobežots juridisko personu skaits.
+HoP Algas lapiņa
+Operatīvai algas lapiņas apskatei bez grāmatvedības iesaistes
+● Detalizēta informācija par algu, 
+prēmijām, ieturējumiem un 
+samaksātajiem nodokļiem.
+● Drukājama algas lapiņa.
+● Vēsturiskie dati par atalgojumu 
+pieejami gan tabulā, gan grafiskā 
+attēlojumā.
+● Informācija par reģistrētajiem 
+apgādājamajiem.
+● Saiti uz algas lapiņu iespējams 
+automatizēti nosūtīt darbiniekiem.
+Horizon Noliktava
+Ērtai noliktavas procesu kontrolei un 
+pārvaldībai
+● Detalizēts preču katalogs.
+● FIFO uzskaites metode ar iespēju precizēt faktiski 
+izsniegtās preču partijas, nodrošinot izsekojamību, 
+derīguma termiņu un nelikvīdo atlikumu kontroli.
+● Preču pašizmaksas aprēķins, iekļaujot preču piegādes 
+izmaksas.
+● Preču rezervēšana plānotajiem darījumiem.
+● Elastīgi pārdošanas cenu un atlaižu mehānismi.
+● Svītrkodu nolasīšanas ierīces 
+Gudra noliktava.
+● Pielāgojamas dokumentu izdrukas formas.
+● Realizācijas pārskati dažādos griezumos.
+● Intrastat atskaites.
+● Datu apmaiņa ar EDISoft, Telema. 
+● Integrācija ar kases sistēmām un interneta veikalu.
+● Noliktavas uzskaites sasaiste ar finanšu uzskaiti.
+
+Integrēti procesi
+Darbs notiek ātri un ērti. Visi dati 
+uzreiz pieejami Horizon sistēmā.
+Operatīvi dati
+Vienmēr zināmi precīzi noliktavas atlikumi. Pieejamas atskaites par kustību un realizāciju dažādos griezumos.
+Optimāli atlikumi
+Iespēja uzturēt pieprasījumam 
+atbilstošus noliktavas krājumus.
+Pamatsistēmas izmaksas
+74 €/mēn.
+2 sistēmas lietotāji
+20 algu kartītes
+Neierobežots firmu skaits
+
+Papildu: 
+10 papildu darbinieki: 6.5 €/mēn.
+1 papildu Horizon lietotājs: 36 €/mēn.
+
+Horizon papildiespējas
+Horizon abonēšanas komplekti
+Pamats Grāmatvedība+ Personāls Bizness
+Grāmatvedība
+Algas 
+Personāls
+Noliktava
+Algas lapiņa HoP
+Datu glabāšana 
+mākoņrisinājumā
+HoP Rēķini
+HoP Materiālie 
+resursi
+HoP Atskaites
+Norēķini
+Resursu uzskaite
+Integrāciju platforma
+Elektroniskā 
+inventarizācija
+HoP Personāls+:- Personāla pieteikumi- Rīkojumi, vienošanās- Komandējumi- “Esmu iepazinies”
+HoP Atskaites
+Integrāciju platforma
+Vairumtirdzniecība
+Ražošana
+Apsaimniekošana
+Mazumtirdzniecība
+Integrāciju platforma
+73  €/mēn. 25 €/mēn. 24 €/mēn. 43 €/mēn.
+Uzzināt vairāk »
+Integrācijas - REST API
+Iekļauts Grāmatvedība+, Personāls, Bizness
+REST API ir atvērta platforma, nodrošinot dažādas iespējas citu 
+biznesa sistēmu savienojuma izveidei ar Horizon. 
+Integrēt iespējams:
+Pasūtījumu apstrādes sistēmas - atbilstoši reģistrētajiem 
+pasūtījumiem, automātiski tiks izveidoti rēķini un pavadzīmes, iegrāmatoti 
+ieņēmumi.
+CRM jeb klientu apkalpošanas sistēmas - klienta dati jāievada tikai 
+vienā no sistēmām, otrā tie nokļūst automātiski.
+E-pakalpojumu sistēmas un interneta veikalus - datus par 
+saņemtajiem maksājumiem automātiski padod internetveikalam, rēķinu 
+izveide notiek automātiski.
+Citas sistēmas - jebkuri Horizon dati, kā piemēram, par rēķiniem, 
+pavadzīmēm, līgumiem vai klientiem var tikt padoti no Horizon uz citām 
+sistēmām vai otrādāk.
+Papildiespējas: 
+Grāmatvedība+
+Grāmatvedība+ iekļauts:
+   Norēķini
+● Maksājumu 
+automatizācija
+● Debitoru novērtēšana
+● Pakalpojuma līgumu 
+uzskaite
+● Iepirkumu līgumu 
+uzskaite
+    Resursu uzskaite
+● Inventārs
+● Elektroniskā inventarizācija
+● Seriālie numuri
+● Autotransports
+  Integrācijas
+REST API - platforma Horizon 
+integrācijai ar citām biznesa 
+sistēmām
+        Darbinieku pašapkalpošanās
+● HoP Rēķini
+● HoP Materiālie resursi
+● HoP Atskaites
+Uzzināt vairāk »
+Darbinieku pašapkalpošanās portāls HoP
+Pieejami dati, neatkarīgi no atrašanās vietas un izmantotās viedierīces
+HoP Rēķini
+Ērtai un ātrai piegādātāju 
+rēķinu apstrādei.
+Uzzināt vairāk  »
+HoP Materiālie resursi
+Efektīvai un precīzai 
+pamatlīdzekļu iekšējai kustībai, 
+norakstīšanai un saskaņošanai.
+Uzzināt vairāk  »
+HoP Atskaites
+Uz Horizon datiem balstītas 
+atskaites operatīvai informācijas 
+apmaiņai.
+Uzzināt vairāk  »
+Maksājumu automatizācija
+Pilnībā automatizēta izejošo un ienākošo maksājumu plūsma
+● Izejošo maksājumu veikšanai vairs nav jāatver 
+internetbanka – pārskaitījumus var veikt tieši no 
+Horizon.
+● Bankas izraksta ielāde un apstrāde notiek 
+automātiski.
+● Iepriekš sagatavotie izejošie maksājumi tiek uzreiz 
+atpazīti un grāmatoti.
+● Automātiski ielādētajā bankas izrakstā redzamie 
+ienākošie maksājumi tiek automātiski apstiprināti, 
+ģenerēti Horizon, izveidotas piesaistes un veikti 
+grāmatojumi.
+● Atpazīti, ģenerēti un grāmatoti tiek arī bankas 
+komisiju un pārvedumu maksājumi.
+● Aktuālais bankas konta atlikums ir redzams 
+Horizon.
+Rēķinu 
+izrakstīšana
+Rēķinu 
+nogādāšana
+1
+Rēķinu 
+saņemšana 
+un apstrāde
+2
+Rēķinu plūsma
+Piegādātājs
+Automatizējams process 
+Maksājumu plūsma
+3
+Saņēmējs
+6 5 4
+Maksājumu 
+saņemšana 
+un apstrāde
+Modulis nodrošina automatizāciju ar Swedbank, SEB, 
+Citadele, Luminor un Valsts kase.
+Uzzināt vairāk »
+Maksājumu 
+nosūtīšana
+Maksājumu 
+sagatavošana
+Elektroniskā inventarizācija
+Efektīvai un automatizētai pamatlīdzekļu un inventāra inventarizācijai, 
+izmantojot mobilās ierīces
+● Ātrs process. Darbs notiek ar mobilo 
+iekārtu, kas sinhronizē informāciju ar 
+Horizon.
+● Precizitāte. Inventarizācijā tiek izmantoti 
+svītrkodi vai 2D kodi, kas izslēdz kļūdu 
+iespējamību.
+● Datu ievade vienreiz. Informācija  tiek 
+reģistrēta mobilajā ierīcē un automātiski 
+nosūtīta uz Horizon.
+● Efektīva kontrole. Aplikācijā tiek fiksēts 
+svītrkoda skenēšanas fakts, kas apstiprina 
+pamatlīdzekļa faktisku atrašanu.
+Uzzināt vairāk »
+Grāmatvedība+ izmaksas
+25 €/mēn.
+Iekļauti 20 darbinieki.
+Darbinieku skaitam ir jāsakrīt ar Pamatsistēmā izvēlēto 
+darbinieku skaitu.
+Papildu: 
+10 papildu darbinieki: 7 €/mēn. 
+Papildiespējas: 
+Personāls
+   Darbinieku 
+pašapkalpošanās
+Personāls iekļauts:
+Uzzināt vairāk »
+   HoP Personāls: 
+Pieteikumi
+● Atvaļinājumu pieteikumi.
+● Citi personāla pieteikumi.
+● Prombūtnes kalendārs.
+● HoP Atskaites
+● HoP Darba laika 
+uzskaite
+ Integrācijas
+REST API - platforma Horizon integrācijai ar 
+citām biznesa sistēmām
+HoP Personāls:
+Komandējumi, izdevumi
+● HoP Komandējumi: pieteikumi 
+un atskaites.
+● HoP Mani izdevumi: 
+saimnieciskie izdevumi.
+   HoP Personāls+
+● Instruktāžas.
+● Rīkojumi un vienošanās.
+Ieguvumi, izmantojot Personāls
+Vairs nav jāglabā un jāuztur papīra 
+dokumenti. Visi dokumenti tiek veidoti, 
+saskaņoti un apstrādāti elektroniski.
+Efektīvs algu un personāla process. 
+Integrēts grāmatvedības un personāla 
+process, nodrošina ātrāku informācijas 
+apmaiņu un precīzāku algu aprēķinu.
+Vairāk laika. Darbinieki var pieteikumus 
+veidot un saskaņot elektroniski, kā arī redzēt 
+informāciju par sevi, tiek būtiski atslogota 
+personāla un grāmatvedības nodaļa.
+Kļūdu samazinājums un dokumentu 
+pieejamība. Nodrošinot visu personāla 
+lietvedības procesu, izmantojot 
+pašapkalpošanos, vairs nepazūd dokumenti.
+Intuitīvs risinājums. HoP risinājums 
+veidots tā, lai būtu viegli saprotams 
+cilvēkiem ar dažādām digitālajām prasmēm.
+Operatīva dokumentu plūsma. HoP ir 
+pieejams no viedierīcēm un jebkuras vietas, 
+kur ir internets, attiecīgi aprite notiek daudz 
+ātrāk un efektīvāk.
+Informācijas pieejamība darbiniekiem.  
+Darbinieki var apskatīt sev aktuālo informāciju 
+jebkurā sev ērtā laikā, neiesaistot personāla 
+nodaļu vai vadītāju.
+Vadītāja rīkojumi par 
+personāla izmaiņu 
+jautājumiem
+Digitālas lietvedības plūsmas ar HoP
+ Pieteikumi Rīkojumi Vienošanās Apliecinājumi
+Atvaļinājumu, pabalstu, 
+komandējumu, mācību u.c.
+pieteikumi
+Darbinieku pieteikumi
+Izmaiņas karjeras gaitā, 
+piemaksas, prēmijas, u.c Darba līgumi un vienošanās
+Darba devēja un 
+darbinieka vienošanās Darbinieka apliecinājumi
+Darba drošības instruktāžas, 
+darba kārtība, IT politika, u.c.
+HoP Personāls pieteikumi Rīkojumi un vienošanās HoP esmu iepazinies
+Uzzināt vairāk  »
+Personāla pieteikumi
+Izmantojot HoP Personāls, darbinieki var:
+● pieteikt atvaļinājumu un apskatīt pieejamās dienas;
+● apskatīt algas lapiņu;
+● saskaņot un pieteikt dažādus personāla pieteikumus, 
+piemēram, komandējumu vai dzīvesvietas, uzvārda maiņu;
+● pievienot un saskaņot komandējuma un saimnieciskos 
+izdevumus elektroniski;
+● redzēt sīkāku informāciju par obligāto veselības pārbaudi, 
+kā arī saņemt brīdinājumus, ka jāveic kārtējā OVP;
+● apskatīt kolēģu prombūtnes un kontaktinformāciju.
+HoP Personāls 
+Uzzināt vairāk  »
+Rīkojumi, vienošanās un 
+apliecinājumi
+Izmantojot HoP Personāls+, iespējams:
+● veidot dokumentus (rīkojumus, vienošanās) HoP sistēmā 
+no gatavām veidnēm;
+● veikt automātiskas izmaiņas personāla datos pēc 
+dokumentu izveides un saskaņošanas;
+● saskaņot dokumentus elektroniski  vēlamajā laikā un 
+viedierīcē;
+● iepazīstināt darbiniekus ar svarīgu informāciju  (piemēram, 
+darba drošības instruktāžas u.c.) attālināti;
+● parakstīt dokumentus, kuriem nepieciešams paraksts, 
+izmantojot drošu elektronisko parakstu.  
+HoP Personāls+ 
+Uzzināt vairāk  »
+Darbinieku pašapkalpošanās portāls HoP
+Pieejami dati, neatkarīgi no atrašanās vietas un izmantotās viedierīces
+HoP Atskaites
+Uz Horizon datiem balstītas 
+atskaites operatīvai informācijas 
+apmaiņai.
+Uzzināt vairāk  »
+HoP Darba laika uzskaite
+Darbiniekiem ar normālo darba 
+laiku savlaicīgu un precīzu darba 
+laika tabeļu ievadei.
+Uzzināt vairāk  »
+Personāls izmaksas
+24 €/mēn.
+Iekļauti 20 HoP lietotāji
+Papildu: 
+10 papildu HoP lietotāji: 12 €/mēn.
+Papildiespēja: 
+Numo DLP
+Numo Darba laika plānošana
+Organizācijām ar nestandarta darba laiku un maiņu grafiku
+Veselības
+iestādēm
+Ražošanas 
+uzņēmumiem
+Vairāk informācijas par risinājumu un izmaksas:
+Uzzināt vairāk »
+Tirdzniecības 
+uzņēmumiem
+Pakalpojumu 
+sniedzējiem
+Ātrāk saplānots un 
+saskaņots darba 
+grafiks
+Ar Numo automātisko 
+plānošanu darba grafiks top 
+20 minūšu laikā. Izveidoto 
+grafiku iespējams elektroniski 
+saskaņot.
+Uzzināt vairāk »
+Optimāls grafiks, 
+ņemot vērā dažādus 
+kritērijus
+Veidojot darba grafiku, 
+risinājums ņem vērā: 
+virsstundu kontroli un 
+likumdošanas prasības, 
+uzņēmuma ievadītos 
+kritērijus, darbinieku vēlmes, 
+no Horizon: atvaļinājumus, 
+komandējumus un DNL.
+Savienots ar 
+Horizon algu 
+aprēķinam*
+No Numo tiek nosūtīta 
+informācija uz Horizon, 
+palīdzot ātrāk un precīzāk 
+veikt algu aprēķinu pēc 
+faktiski nostrādātajām 
+stundām.
+Samazinās kļūdu iespējamība.
+*būs pieejams Q1, 2025
+Drošas 
+jaunākās
+ tehnoloģijas
+Numo atrodas Microsoft datu 
+centros Eiropā, nodrošinot 
+augstu pieejamību un 
+drošību.
+Numo izmaksas
+50 €/mēn.
+pirmie 20 darbinieki
+Papildu 10 darbinieki: 15  €/mēn.
+virs 250 darbiniekiem: 13 €/mēn. par 10 darbiniekiem
+Papildiespējas: 
+Bizness
+Bizness iekļauts:
+Papildiespējas specifiskiem biznesa procesiem
+Vairumtirdzniecība
+Preču loģistika: pārskatāmai 
+preču aprites plūsmai - no 
+piedāvājuma līdz 
+pārdošanai.
+Ražošana
+Efektīvai ražošanas procesa 
+nodrošināšanai, plānošanai 
+un uzskaitei.
+Apsaimniekošana
+Precīzai un pilnīgai ar 
+nekustamo īpašumu 
+pārvaldību saistītajiem 
+procesiem uzskaitei. 
+procesiem.
+Uzzināt vairāk »
+Uzzināt vairāk »
+Uzzināt vairāk »
+  Mazumtirdzniecība
+Sadarbībā ar Strongpoint 
+izstrādāts POS kases 
+risinājums: Horizon un 
+kases sinhronizācijai preču, 
+lojalitātes karšu, cenu un 
+atlaižu matricas datu 
+nodošanai.
+Integrāciju
+platforma
+REST API - platforma 
+Horizon integrācijai ar 
+citām biznesa sistēmām
+Vairumtirdzniecība
+Pārskatāma preču aprites plūsma - no 
+piedāvājuma līdz pārdošanai
+● Ietaupīts laiks. Atvieglo datu ievadi - informācija 
+tiek ievadīta vienu reizi, izvairoties no datu 
+pārvades kļūdām/nesakritībām.
+● Efektīvi organizēts process. Kontrole pār visu 
+preču aprites procesu - piedāvājums, pieprasījums 
+no klienta, pasūtījums piegādātājam un piegāde.
+● Pārskatāma preču plūsma. Redzama aktuālā 
+informācija par noliktavu - kas, kam, cik daudz 
+vajadzīgs, kā arī pasūtījumu statuss. Atvieglo preču 
+iekšējo kustību un uzskaiti.
+● Ērta plānošana. Pasūtījumu plānošana, ņemot 
+vērā noliktavas apgrozījumu un preču noteikto 
+minimumu noliktavā. Vēlamo un apstiprināto 
+piegādes laiku un preču daudzumu pārvaldība.
+Uzzināt vairāk »
+Ražošana
+Efektīvai ražošanas procesa nodrošināšanai, 
+plānošanai un uzskaitei
+● Vairāku līmeņu produkta tehnoloģiskā apraksta 
+veidošana.
+● Produkta plānotās un faktiskās pašizmaksas 
+kalkulācija.
+● Ražošanas plānošana un operatīvā vadība.
+● Materiālu vajadzību un izlietojuma noteikšana un 
+analīze.
+● Elastīgu tehnoloģisko shēmu veidošana.
+● Precīzs darba samaksas aprēķins.
+Uzzināt vairāk »
+Apsaimniekošana
+Pilnīga uzskaite visiem ar nekustamo īpašumu 
+pārvaldību saistītajiem procesiem
+NĪP risinājums nodrošina:
+● objektu (telpu grupas, būves (ēkas), zemes vienības un to daļas) un skaitītāju 
+uzskaiti vienotā datu glabātuvē; 
+● sinhronizāciju ar VZD Kadastra reģistru;.
+● vienotu fizisko un juridisko personu sarakstu (sistēma nodrošina debitoru uzskaiti 
+pa līgumiem - mainoties objekta īpašumtiesībām, debitora parāds netiek 
+pazaudēts);
+● pakalpojumu un aprēķinu metodikas konfigurēšana pašu spēkiem, bez 
+programmētāju iesaistes;
+● automātisku rēķinu ģenerēšanu un debitoru uzskaiti uzreiz grāmatvedības sistēmā, 
+nodrošinot vienkāršāku datu salīdzināšanu un kontroli starp realizāciju un 
+virsgrāmatu;
+● pilnīgu informāciju par apsaimniekošanas darbu izdevumiem objektos;
+● dažāda veida atskaites par objekta ieņēmumiem un izdevumiem, kā arī bilanci;
+● ātri un ērti iegūstamus pārskatus pa konkrētām pozīcijām, kā arī kopumā par visu 
+objektu.
+Uzzināt vairāk »
+Bizness izmaksas
+43 €/mēn.
+Uzzināt vairāk »
+Partneru un 
+citi integrēti 
+risinājumi
+firmas.lv
+Automātiskai UR datu 
+ievadei, pārbaudei un 
+monitorēšanai.
+Tiki-Taka PAY
+Mobilā kases sistēma ātrai un
+precīzai pirkumu 
+noformēšanai.
+Unifiedpost e-rēķini
+Tiešsaistes risinājums 
+elektronisko rēķinu 
+saņemšanai un nosūtīšanai.
+flex.bi
+Biznesa analītikas risinājums 
+pārskatāmiem un ātri 
+pieejamiem biznesa 
+rezultātiem tiešaistē.
+Gudra noliktava
+Mobilais risinājums preču 
+aprites datu ievadei Horizon.
+e.Pasūtījumi
+Ātrai, ērtai un efektīvai klientu 
+pasūtījumu pieņemšanai.
+Cunami WEB
+Lietotājiem draudzīgs e-komercijas 
+risinājums, kas nodrošina ātru datu 
+apmaiņu un procesu automatizāciju.
+Bill.me
+Vienots rīks nekustamo 
+īpašumu apsaimniekotājiem 
+un komunālo pakalpojumu 
+sniedzējiem.
+Palma Forest
+Pipedrive
+Mežsaimniecības automatizācijas 
+risinājums apsaimniekotājiem un 
+izstrādātājiem.
+Meemo e-Work Safety
+Risinājums darba aizsardzības 
+procesu automatizācijai.
+CRM risinājums 
+automatizētam ikdienas 
+pārdošanas darbam.
+Shopify
+E-komercijas platforma 
+interneta veikalu izveidei un 
+pārvaldīšanai.
+Palma Medical
+Vienota sistēma medicīnas 
+iestāžu pilnīgai procesu 
+pārvaldībai. 
+Atbalsts
+Atbalsts un produkta attīstība
+Apmācības
+Atbalsta portāls
+Regulāras apmācības 
+nelielās grupās un 
+pamatsistēmas video 
+apmācības
+
+
+Bezmaksas ekspertu 
+padomi klientiem un 
+vieta sarunām ar citiem 
+Horizon lietotājiem
+Visma Community »
+Konsultācijas
+Atjauninājumi
+Individuālas 
+konsultācijas pa 
+tālruni, e-pastu vai 
+atbalsta sistēmā
+Atbalsta iespējas »
+Regulāri Visma 
+Horizon un HoP 
+sistēmu uzlabojumi 
+un atjauninājumi
+Versijas »
+Produkta attīstība
+Horizon un HoP versiju 
+attīstības plāni, kā arī 
+iespēja balsot par sev 
+svarīgākajām izstrādēm
+Attīstība  »
+Atbalsta līmeņi Visma klientiem
+Uzzināt vairāk »
+
+
+Kā notiek Horizon ieviešana?
+● Sadarbības uzņēmuma izvēle - SIA Visma Enterprise vai kāds no izplatīšanas partneriem. 
+● Horizon speciālistu saziņa ar uzņēmumu un tā specifikas/prasību izvērtēšana, lai piedāvātu 
+piemērotāko risinājumu.
+● Vienošanās par risinājumu un izmaksām, līguma slēgšana.
+● Projekta ieviešanas fāze, kuras ilgums atkarīgs no projekta sarežģītības (vidējais ieviešanas ilgums ir 
+3-6 mēneši).
+● Konsultācijas, kas nepieciešamas, lai apgūtu prasmes pilnvērtīgai resursu vadības programmas 
+izmantošanai.
+● Programmas uzturēšanas fāze, kuras laikā uzņēmums saņem programmas atjauninājumus, kā arī 
+konsultācijas atbilstoši ar izplatītāju noslēgtajam līgumam
