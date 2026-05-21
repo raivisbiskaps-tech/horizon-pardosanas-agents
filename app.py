@@ -10,11 +10,14 @@ Lietošana:
 import os
 import sys
 import time
+import io
+import re
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import streamlit as st
+import pandas as pd
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -52,7 +55,12 @@ Konteksts par klientu:
 
 Stils:
 - Atbildi vieglā, sarunbiedra valodā
-- Var izmantot humoru un iepīt atbildēs pa kādam jokam"""
+- Var izmantot humoru un iepīt atbildēs pa kādam jokam
+
+Tabulas:
+- Ja jautājums ir par izmaksām, cenām, moduļiem, pakalpojumiem vai salīdzinājumiem — obligāti izmanto Markdown tabulas formātu
+- Tabulas galvenei izmanto treknrakstu (|**Modulis**|**Cena**| u.tml.)
+- Ciparus un cenas formatē konsekventi"""
 
 
 # ── Indeksēšana ───────────────────────────────────────────────────────────────
@@ -190,6 +198,42 @@ Jautājums: {question}"""
             return f"❌ Kļūda: {str(e)}"
 
 
+# ── Excel eksports ────────────────────────────────────────────────────────────
+
+def extract_markdown_tables(text: str) -> list[pd.DataFrame]:
+    """Parsē visas Markdown tabulas no teksta un atgriež DataFrame sarakstu."""
+    tables = []
+    # Atrod tabulas blokus (vismaz divas rindas ar | simbolu)
+    table_pattern = re.compile(
+        r'(\|.+\|\n\|[-| :]+\|\n(?:\|.+\|\n?)+)',
+        re.MULTILINE
+    )
+    for match in table_pattern.finditer(text):
+        lines = [l.strip() for l in match.group(0).strip().splitlines() if l.strip()]
+        # Izfiltrē atdalītāja rindu (---|---|---)
+        data_lines = [l for l in lines if not re.match(r'^\|[-| :]+\|$', l)]
+        rows = []
+        for line in data_lines:
+            # Sadala pēc | un notīra atstarpes un treknrakstu **...**
+            cells = [re.sub(r'\*\*(.+?)\*\*', r'\1', c.strip())
+                     for c in line.strip('|').split('|')]
+            rows.append(cells)
+        if len(rows) >= 2:
+            df = pd.DataFrame(rows[1:], columns=rows[0])
+            tables.append(df)
+    return tables
+
+
+def tables_to_excel_bytes(tables: list[pd.DataFrame]) -> bytes:
+    """Pārvērš DataFrame sarakstu Excel faila baitiem."""
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        for i, df in enumerate(tables):
+            sheet_name = f"Tabula_{i+1}" if len(tables) > 1 else "Dati"
+            df.to_excel(writer, index=False, sheet_name=sheet_name)
+    return buf.getvalue()
+
+
 # ── E-pasta sūtīšana ─────────────────────────────────────────────────────────
 
 def send_chat_by_email(messages: list) -> tuple[bool, str]:
@@ -260,9 +304,21 @@ def main():
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    for msg in st.session_state.messages:
+    for idx, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
+            if msg["role"] == "assistant":
+                tables = extract_markdown_tables(msg["content"])
+                if tables:
+                    excel_bytes = tables_to_excel_bytes(tables)
+                    ts = msg.get("timestamp", str(idx))
+                    st.download_button(
+                        label="📥 Lejupielādēt kā Excel",
+                        data=excel_bytes,
+                        file_name=f"horizon_aprekins_{ts}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"dl_{idx}",
+                    )
             if msg.get("sources"):
                 with st.expander("📎 Avoti"):
                     for src in msg["sources"]:
@@ -284,6 +340,17 @@ def main():
                     answer = ask_ai(question, context, st.session_state.selected_model)
 
             st.markdown(answer)
+            # Ja atbildē ir tabula — piedāvā Excel lejupielādi
+            tables = extract_markdown_tables(answer)
+            if tables:
+                excel_bytes = tables_to_excel_bytes(tables)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                st.download_button(
+                    label="📥 Lejupielādēt kā Excel",
+                    data=excel_bytes,
+                    file_name=f"horizon_aprekins_{timestamp}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
             if sources:
                 with st.expander("📎 Avoti"):
                     for src in sources:
@@ -293,6 +360,7 @@ def main():
             "role": "assistant",
             "content": answer,
             "sources": sources,
+            "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
         })
 
     # Sānjosla
