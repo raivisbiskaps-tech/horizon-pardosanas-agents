@@ -102,13 +102,15 @@ def load_mistral_client():
 
 @st.cache_resource(show_spinner="Savieno ar Gemini...")
 def load_gemini_client():
-    """Inicializē Gemini klientu."""
-    import google.generativeai as genai
+    """Inicializē Gemini klientu caur OpenAI-saderīgo API."""
+    from openai import OpenAI
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
         return None
-    genai.configure(api_key=api_key)
-    return genai
+    return OpenAI(
+        api_key=api_key,
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+    )
 
 
 # ── RAG ───────────────────────────────────────────────────────────────────────
@@ -166,16 +168,17 @@ Jautājums: {question}"""
                 return response.choices[0].message.content
 
             elif provider == "gemini":
-                import google.generativeai as genai
-                genai_client = load_gemini_client()
-                if not genai_client:
+                client = load_gemini_client()
+                if not client:
                     return "❌ GOOGLE_API_KEY nav iestatīts Streamlit Secrets."
-                model = genai.GenerativeModel(
-                    model_id,
-                    system_instruction=SYSTEM_PROMPT
+                response = client.chat.completions.create(
+                    model=model_id,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user",   "content": user_message},
+                    ],
                 )
-                response = model.generate_content(user_message)
-                return response.text
+                return response.choices[0].message.content
 
         except Exception as e:
             error_str = str(e).lower()
