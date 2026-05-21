@@ -22,7 +22,14 @@ CHROMA_DIR   = os.path.join(BASE_DIR, "chroma_db")
 DOCS_DIR     = os.path.join(BASE_DIR, "docs")
 COLLECTION_NAME = "dokumentacija"
 TOP_K_RESULTS   = 30
-MISTRAL_MODEL   = "mistral-small-latest"
+
+# Pieejamie modeļi
+MODELS = {
+    "🟠 Mistral Small":  {"provider": "mistral", "model": "mistral-small-latest"},
+    "🟠 Mistral Large":  {"provider": "mistral", "model": "mistral-large-2411"},
+    "🔵 Gemini Flash":   {"provider": "gemini",  "model": "gemini-1.5-flash"},
+    "🔵 Gemini Pro":     {"provider": "gemini",  "model": "gemini-1.5-pro"},
+}
 
 SYSTEM_PROMPT = """Tu esi pieredzējis ERP Horizon pārdošanas atbalsta speciālists, kas sniedz detalizētas un noderīgas atbildes, balstoties uz sniegto informāciju. Izplatām, izstrādājam un ieviešam ERP Horizon. Tava uzdevums ir sniegt atbildes uz potenciālo klientu jautājumiem.
 
@@ -82,13 +89,22 @@ def load_collection():
 
 @st.cache_resource(show_spinner="Savieno ar AI...")
 def load_mistral_client():
-    """Inicializē Mistral klientu caur OpenAI-saderīgo API."""
+    """Inicializē Mistral klientu."""
     from openai import OpenAI
     api_key = os.getenv("MISTRAL_API_KEY")
     if not api_key:
-        st.error("❌ MISTRAL_API_KEY nav iestatīts. Pievieno to Streamlit Secrets.")
-        st.stop()
+        return None
     return OpenAI(api_key=api_key, base_url="https://api.mistral.ai/v1")
+
+@st.cache_resource(show_spinner="Savieno ar Gemini...")
+def load_gemini_client():
+    """Inicializē Gemini klientu."""
+    import google.generativeai as genai
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        return None
+    genai.configure(api_key=api_key)
+    return genai
 
 
 # ── RAG ───────────────────────────────────────────────────────────────────────
@@ -114,39 +130,57 @@ def retrieve_context(collection, question: str) -> tuple[str, list[str]]:
     return "\n\n---\n\n".join(context_parts), sources
 
 
-def ask_mistral(client, question: str, context: str) -> str:
-    """Nosūta jautājumu un kontekstu uz Mistral API ar atkārtošanas loģiku."""
+def ask_ai(question: str, context: str, model_name: str) -> str:
+    """Nosūta jautājumu uz izvēlēto AI modeli."""
+    model_cfg = MODELS[model_name]
+    provider  = model_cfg["provider"]
+    model_id  = model_cfg["model"]
+
     user_message = f"""Zemāk ir VIENĪGIE dokumentu fragmenti, ko drīksti izmantot atbildē.
 Ja atbilde nav šajos fragmentos — nekādā gadījumā to neizdomā.
 
-=== DOKUMENTU FRAGMENTI (VIENĪGAIS AVOTS) ===
+=== DOKUMENTU FRAGMENTI ===
 {context}
-=== FRAGMENTU BEIGAS ===
+=== BEIGAS ===
 
-Jautājums: {question}
-
-Atceries: atbildi TIKAI no iepriekš sniegtajiem fragmentiem. Ja informācija tur nav — saki to tieši."""
+Jautājums: {question}"""
 
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            response = client.chat.completions.create(
-                model=MISTRAL_MODEL,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user_message},
-                ],
-            )
-            return response.choices[0].message.content
+            if provider == "mistral":
+                client = load_mistral_client()
+                if not client:
+                    return "❌ MISTRAL_API_KEY nav iestatīts Streamlit Secrets."
+                response = client.chat.completions.create(
+                    model=model_id,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user",   "content": user_message},
+                    ],
+                )
+                return response.choices[0].message.content
+
+            elif provider == "gemini":
+                import google.generativeai as genai
+                genai_client = load_gemini_client()
+                if not genai_client:
+                    return "❌ GOOGLE_API_KEY nav iestatīts Streamlit Secrets."
+                model = genai.GenerativeModel(
+                    model_id,
+                    system_instruction=SYSTEM_PROMPT
+                )
+                response = model.generate_content(user_message)
+                return response.text
+
         except Exception as e:
             error_str = str(e).lower()
             if "rate" in error_str or "limit" in error_str or "429" in error_str:
                 if attempt < max_retries - 1:
-                    wait = 5 * (attempt + 1)  # 5s, 10s, 15s
-                    time.sleep(wait)
+                    time.sleep(5 * (attempt + 1))
                     continue
                 return "⚠️ Sistēma šobrīd ir noslogota. Lūdzu, mēģini vēlreiz pēc dažām sekundēm."
-            raise
+            return f"❌ Kļūda: {str(e)}"
 
 
 # ── Streamlit UI ──────────────────────────────────────────────────────────────
@@ -173,8 +207,7 @@ def main():
 
     # Indeksē un ielādē resursus
     auto_ingest()
-    collection     = load_collection()
-    mistral_client = load_mistral_client()
+    collection = load_collection()
 
     # ── Čats ──────────────────────────────────────────────────────────────────
     if "messages" not in st.session_state:
@@ -201,7 +234,7 @@ def main():
                     answer  = "Šī informācija nav pieejama dokumentācijā."
                     sources = []
                 else:
-                    answer = ask_mistral(mistral_client, question, context)
+                    answer = ask_ai(question, context, st.session_state.selected_model)
 
             st.markdown(answer)
             if sources:
@@ -217,6 +250,15 @@ def main():
 
     # Sānjosla
     with st.sidebar:
+        st.header("🤖 AI modelis")
+        if "selected_model" not in st.session_state:
+            st.session_state.selected_model = list(MODELS.keys())[0]
+        st.session_state.selected_model = st.selectbox(
+            "Izvēlies modeli:",
+            options=list(MODELS.keys()),
+            index=list(MODELS.keys()).index(st.session_state.selected_model),
+        )
+        st.divider()
         st.header("ℹ️ Informācija")
         try:
             st.metric("Indeksēti fragmenti", collection.count())
@@ -229,7 +271,7 @@ def main():
             st.cache_resource.clear()
             st.rerun()
         st.divider()
-        st.caption("Darbināts ar Mistral AI")
+        st.caption(f"Modelis: {MODELS[st.session_state.selected_model]['model']}")
 
 
 if __name__ == "__main__":
