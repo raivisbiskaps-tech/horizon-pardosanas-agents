@@ -10,6 +10,10 @@ Lietošana:
 import os
 import sys
 import time
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from datetime import datetime
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -183,6 +187,46 @@ Jautājums: {question}"""
             return f"❌ Kļūda: {str(e)}"
 
 
+# ── E-pasta sūtīšana ─────────────────────────────────────────────────────────
+
+def send_chat_by_email(messages: list) -> tuple[bool, str]:
+    """Nosūta čata vēsturi uz e-pastu caur Gmail."""
+    gmail_user     = os.getenv("GMAIL_USER")
+    gmail_password = os.getenv("GMAIL_APP_PASSWORD")
+    target_email   = os.getenv("TARGET_EMAIL")
+
+    if not all([gmail_user, gmail_password, target_email]):
+        return False, "❌ Nav iestatīti e-pasta mainīgie (GMAIL_USER, GMAIL_APP_PASSWORD, TARGET_EMAIL)."
+
+    if not messages:
+        return False, "❌ Čats ir tukšs — nav ko sūtīt."
+
+    # Veido e-pasta saturu
+    timestamp = datetime.now().strftime("%d.%m.%Y %H:%M")
+    body = f"Horizon pārdošanas aģents — saruna {timestamp}\n"
+    body += "=" * 60 + "\n\n"
+
+    for msg in messages:
+        role  = "👤 Klients" if msg["role"] == "user" else "🤖 Aģents"
+        body += f"{role}:\n{msg['content']}\n\n"
+        body += "-" * 40 + "\n\n"
+
+    # Veido e-pastu
+    email_msg = MIMEMultipart()
+    email_msg["From"]    = gmail_user
+    email_msg["To"]      = target_email
+    email_msg["Subject"] = f"Horizon aģents — saruna {timestamp}"
+    email_msg.attach(MIMEText(body, "plain", "utf-8"))
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(gmail_user, gmail_password)
+            server.send_message(email_msg)
+        return True, f"✅ Saruna nosūtīta uz {target_email}"
+    except Exception as e:
+        return False, f"❌ Sūtīšanas kļūda: {e}"
+
+
 # ── Streamlit UI ──────────────────────────────────────────────────────────────
 
 def main():
@@ -264,6 +308,12 @@ def main():
             st.metric("Indeksēti fragmenti", collection.count())
         except Exception:
             pass
+        if st.button("📧 Nosūtīt sarunu uz e-pastu"):
+            ok, msg = send_chat_by_email(st.session_state.messages)
+            if ok:
+                st.success(msg)
+            else:
+                st.error(msg)
         if st.button("🗑️ Notīrīt čatu"):
             st.session_state.messages = []
             st.rerun()
