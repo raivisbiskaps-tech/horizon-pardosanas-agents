@@ -149,8 +149,8 @@ def retrieve_context(collection, question: str) -> tuple[str, list[str]]:
     return "\n\n---\n\n".join(context_parts), sources
 
 
-def ask_ai(question: str, context: str, model_name: str) -> str:
-    """Nosūta jautājumu uz izvēlēto AI modeli."""
+def ask_ai(question: str, context: str, model_name: str, history: list = None) -> str:
+    """Nosūta jautājumu uz izvēlēto AI modeli, iekļaujot sarakstes vēsturi."""
     model_cfg = MODELS[model_name]
     provider  = model_cfg["provider"]
     model_id  = model_cfg["model"]
@@ -164,6 +164,20 @@ Ja atbilde nav šajos fragmentos — nekādā gadījumā to neizdomā.
 
 Jautājums: {question}"""
 
+    # Veido ziņojumu sarakstu ar sarakstes vēsturi
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    # Pievieno iepriekšējos ziņojumus (bez pēdējā user ziņojuma, kas jau ir user_message)
+    if history:
+        for msg in history[:-1]:
+            messages.append({
+                "role": msg["role"],
+                "content": msg["content"],
+            })
+
+    # Pievieno pašreizējo jautājumu ar dokumentu kontekstu
+    messages.append({"role": "user", "content": user_message})
+
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -173,10 +187,7 @@ Jautājums: {question}"""
                     return "❌ MISTRAL_API_KEY nav iestatīts Streamlit Secrets."
                 response = client.chat.completions.create(
                     model=model_id,
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user",   "content": user_message},
-                    ],
+                    messages=messages,
                 )
                 return response.choices[0].message.content
 
@@ -186,10 +197,7 @@ Jautājums: {question}"""
                     return "❌ GOOGLE_API_KEY nav iestatīts Streamlit Secrets."
                 response = client.chat.completions.create(
                     model=model_id,
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user",   "content": user_message},
-                    ],
+                    messages=messages,
                 )
                 return response.choices[0].message.content
 
@@ -342,7 +350,7 @@ def main():
                     answer  = "Šī informācija nav pieejama dokumentācijā."
                     sources = []
                 else:
-                    answer = ask_ai(question, context, st.session_state.selected_model)
+                    answer = ask_ai(question, context, st.session_state.selected_model, st.session_state.messages)
 
             st.markdown(answer)
             # Ja atbildē ir tabula — piedāvā Excel lejupielādi
