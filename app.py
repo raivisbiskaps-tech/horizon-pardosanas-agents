@@ -230,6 +230,7 @@ Sarakstes vēsture:
 
 Atbildi šādā JSON formātā:
 {{
+  "klients": "Klienta vārds vai uzņēmuma nosaukums, ja tas minēts sarakstē. Ja nav minēts — 'Nav norādīts'",
   "client_interests": "Īss kopsavilkums par ko klients interesējas (1-2 teikumi)",
   "modules": "Pieminētie Horizon moduļi vai pakotnes (vai 'Nav precizēts')",
   "key_questions": "Galvenie klienta jautājumi (1-3 punkti)",
@@ -289,11 +290,7 @@ def create_qwilr_proposal(messages: list, model_name: str) -> tuple[bool, str]:
     }
 
     substitutions = {
-        "sarakstes_datums": timestamp,
-        "klienta_intereses": summary.get("client_interests", "Nav norādīts"),
-        "moduli": summary.get("modules", "Nav precizēts"),
-        "galvenie_jautajumi": summary.get("key_questions", "Nav norādīts"),
-        "nakamie_soli": summary.get("next_steps", "Nav norādīts"),
+        "Klients": summary.get("klients", "Nav norādīts"),
     }
 
     payload = {
