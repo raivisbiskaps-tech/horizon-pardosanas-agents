@@ -289,10 +289,20 @@ def create_qwilr_proposal(messages: list, model_name: str) -> tuple[bool, str]:
 
     # Veido Qwilr lapu
     import requests as req
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
+
+    # Izmēģina visus iespējamos autentifikācijas formātus
+    auth_formats = [
+        f"Bearer {api_key}",
+        f"Token {api_key}",
+        api_key,
+    ]
+
+    last_error = ""
+    for auth_value in auth_formats:
+        headers = {
+            "Authorization": auth_value,
+            "Content-Type": "application/json",
+        }
 
     substitutions = {
         "Klients": summary.get("klients", "Nav norādīts"),
@@ -306,14 +316,24 @@ def create_qwilr_proposal(messages: list, model_name: str) -> tuple[bool, str]:
     }
 
     try:
-        response = req.post(
-            "https://api.qwilr.com/v1/pages",
-            headers=headers,
-            json=payload,
-            timeout=15,
-        )
+        response = None
+        for auth_value in auth_formats:
+            headers = {
+                "Authorization": auth_value,
+                "Content-Type": "application/json",
+            }
+            response = req.post(
+                "https://api.qwilr.com/v1/pages",
+                headers=headers,
+                json=payload,
+                timeout=15,
+            )
+            if response.status_code != 401:
+                break
+            last_error = f"Auth '{auth_value[:12]}...' → 401"
+
         if not response.ok:
-            return False, f"❌ Qwilr kļūda {response.status_code}: {response.text}\n\n🔍 Debug: {debug_info}"
+            return False, f"❌ Qwilr kļūda {response.status_code}: {response.text}\n\n🔍 Debug: {debug_info}\nMēģināti formāti: Bearer, Token, raw"
         data = response.json()
         page_url = (
             data.get("viewUrl") or
