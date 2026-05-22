@@ -297,8 +297,9 @@ def create_qwilr_proposal(messages: list, model_name: str) -> tuple[bool, str]:
     }
 
     payload = {
-        "name": f"Horizon piedāvājums — {timestamp}",
+        "title": f"Horizon piedāvājums — {timestamp}",
         "templateId": template_id,
+        "published": True,
         "substitutions": substitutions,
     }
 
@@ -309,9 +310,16 @@ def create_qwilr_proposal(messages: list, model_name: str) -> tuple[bool, str]:
             json=payload,
             timeout=15,
         )
-        response.raise_for_status()
+        if not response.ok:
+            return False, f"❌ Qwilr kļūda {response.status_code}: {response.text}"
         data = response.json()
-        page_url = data.get("viewUrl") or data.get("url") or data.get("link", "")
+        page_url = (
+            data.get("viewUrl") or
+            data.get("url") or
+            data.get("link") or
+            data.get("previewUrl") or
+            ""
+        )
 
         # Nosūta saiti uz e-pastu
         if target_email and page_url:
