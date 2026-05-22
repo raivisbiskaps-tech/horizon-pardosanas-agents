@@ -211,6 +211,137 @@ Jautājums: {question}"""
             return f"❌ Kļūda: {str(e)}"
 
 
+# ── Qwilr integrācija ────────────────────────────────────────────────────────
+
+def summarize_chat_for_proposal(messages: list, model_name: str) -> dict:
+    """Izmanto AI, lai no sarakstes iegūtu strukturētu kopsavilkumu piedāvājumam."""
+    if not messages:
+        return {}
+
+    history_text = ""
+    for msg in messages:
+        role = "Klients" if msg["role"] == "user" else "Aģents"
+        history_text += f"{role}: {msg['content']}\n\n"
+
+    prompt = f"""No šīs sarakstes iegūsti strukturētu informāciju piedāvājumam. Atbildi TIKAI JSON formātā, bez papildu teksta.
+
+Sarakstes vēsture:
+{history_text}
+
+Atbildi šādā JSON formātā:
+{{
+  "client_interests": "Īss kopsavilkums par ko klients interesējas (1-2 teikumi)",
+  "modules": "Pieminētie Horizon moduļi vai pakotnes (vai 'Nav precizēts')",
+  "key_questions": "Galvenie klienta jautājumi (1-3 punkti)",
+  "next_steps": "Ieteicamie nākamie soļi (1-2 teikumi)"
+}}"""
+
+    model_cfg = MODELS[model_name]
+    try:
+        if model_cfg["provider"] == "mistral":
+            client = load_mistral_client()
+            if not client:
+                return {}
+        else:
+            client = load_gemini_client()
+            if not client:
+                return {}
+
+        response = client.chat.completions.create(
+            model=model_cfg["model"],
+            messages=[{"role": "user", "content": prompt}],
+        )
+        import json
+        text = response.choices[0].message.content.strip()
+        # Izņem JSON no atbildes
+        if "```" in text:
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        return json.loads(text)
+    except Exception:
+        return {}
+
+
+def create_qwilr_proposal(messages: list, model_name: str) -> tuple[bool, str]:
+    """Izveido Qwilr piedāvājumu no sarakstes un nosūta saiti uz e-pastu."""
+    api_key     = os.getenv("QWILR_API_KEY")
+    template_id = os.getenv("QWILR_TEMPLATE_ID")
+    target_email = os.getenv("TARGET_EMAIL")
+
+    if not api_key:
+        return False, "❌ QWILR_API_KEY nav iestatīts Streamlit Secrets."
+    if not template_id:
+        return False, "❌ QWILR_TEMPLATE_ID nav iestatīts Streamlit Secrets."
+
+    if not messages:
+        return False, "❌ Čats ir tukšs — nav ko iekļaut piedāvājumā."
+
+    # Iegūst sarakstes kopsavilkumu
+    summary = summarize_chat_for_proposal(messages, model_name)
+    timestamp = datetime.now().strftime("%d.%m.%Y %H:%M")
+
+    # Veido Qwilr lapu
+    import requests as req
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    substitutions = {
+        "sarakstes_datums": timestamp,
+        "klienta_intereses": summary.get("client_interests", "Nav norādīts"),
+        "moduli": summary.get("modules", "Nav precizēts"),
+        "galvenie_jautajumi": summary.get("key_questions", "Nav norādīts"),
+        "nakamie_soli": summary.get("next_steps", "Nav norādīts"),
+    }
+
+    payload = {
+        "name": f"Horizon piedāvājums — {timestamp}",
+        "templateId": template_id,
+        "substitutions": substitutions,
+    }
+
+    try:
+        response = req.post(
+            "https://api.qwilr.com/v1/pages",
+            headers=headers,
+            json=payload,
+            timeout=15,
+        )
+        response.raise_for_status()
+        data = response.json()
+        page_url = data.get("viewUrl") or data.get("url") or data.get("link", "")
+
+        # Nosūta saiti uz e-pastu
+        if target_email and page_url:
+            gmail_user     = os.getenv("GMAIL_USER")
+            gmail_password = os.getenv("GMAIL_APP_PASSWORD")
+            if gmail_user and gmail_password:
+                body = f"Horizon piedāvājums sagatavots {timestamp}\n\n"
+                body += f"Qwilr saite: {page_url}\n\n"
+                body += f"Klienta intereses: {substitutions['klienta_intereses']}\n"
+                body += f"Moduļi: {substitutions['moduli']}\n"
+                body += f"Galvenie jautājumi: {substitutions['galvenie_jautajumi']}\n"
+                body += f"Nākamie soļi: {substitutions['nakamie_soli']}\n"
+
+                from email.mime.text import MIMEText
+                from email.mime.multipart import MIMEMultipart
+                email_msg = MIMEMultipart()
+                email_msg["From"]    = gmail_user
+                email_msg["To"]      = target_email
+                email_msg["Subject"] = f"Horizon Qwilr piedāvājums — {timestamp}"
+                email_msg.attach(MIMEText(body, "plain", "utf-8"))
+                import smtplib
+                with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+                    server.login(gmail_user, gmail_password)
+                    server.send_message(email_msg)
+
+        return True, page_url if page_url else "✅ Piedāvājums izveidots Qwilr."
+    except Exception as e:
+        return False, f"❌ Qwilr kļūda: {str(e)}"
+
+
 # ── Excel eksports ────────────────────────────────────────────────────────────
 
 def extract_markdown_tables(text: str) -> list[pd.DataFrame]:
@@ -392,6 +523,21 @@ def main():
             st.metric("Indeksēti fragmenti", collection.count())
         except Exception:
             pass
+        if st.button("📄 Sagatavot Qwilr piedāvājumu"):
+            if not st.session_state.messages:
+                st.warning("⚠️ Uzsāc sarakstes pirms piedāvājuma sagatavošanas.")
+            else:
+                with st.spinner("Sagatavo piedāvājumu..."):
+                    ok, result = create_qwilr_proposal(
+                        st.session_state.messages,
+                        st.session_state.selected_model,
+                    )
+                if ok:
+                    st.success("✅ Piedāvājums sagatavots!")
+                    st.markdown(f"[📄 Atvērt Qwilr]({result})")
+                else:
+                    st.error(result)
+        st.divider()
         if st.button("📧 Nosūtīt sarunu uz e-pastu"):
             ok, msg = send_chat_by_email(st.session_state.messages)
             if ok:
