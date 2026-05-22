@@ -275,6 +275,11 @@ def create_qwilr_proposal(messages: list, model_name: str) -> tuple[bool, str]:
     if not template_id:
         return False, "❌ QWILR_TEMPLATE_ID nav iestatīts Streamlit Secrets."
 
+    # Debug: pārbauda vai atslēga tiek nolasīta (rāda pirmos 6 simbolus)
+    api_key = api_key.strip()
+    template_id = template_id.strip()
+    debug_info = f"API key garums: {len(api_key)}, sākas ar: '{api_key[:6]}...', Template ID garums: {len(template_id)}"
+
     if not messages:
         return False, "❌ Čats ir tukšs — nav ko iekļaut piedāvājumā."
 
@@ -308,7 +313,7 @@ def create_qwilr_proposal(messages: list, model_name: str) -> tuple[bool, str]:
             timeout=15,
         )
         if not response.ok:
-            return False, f"❌ Qwilr kļūda {response.status_code}: {response.text}"
+            return False, f"❌ Qwilr kļūda {response.status_code}: {response.text}\n\n🔍 Debug: {debug_info}"
         data = response.json()
         page_url = (
             data.get("viewUrl") or
