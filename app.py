@@ -265,21 +265,11 @@ Atbildi šādā JSON formātā:
 
 
 def create_qwilr_proposal(messages: list, model_name: str) -> tuple[bool, str]:
-    """Izveido Qwilr piedāvājumu no sarakstes un nosūta saiti uz e-pastu."""
-    api_key     = os.getenv("QWILR_API_KEY")
-    template_id = os.getenv("QWILR_TEMPLATE_ID")
-    target_email = os.getenv("TARGET_EMAIL")
+    """Nosūta sarakstes datus uz Zapier Webhook, kas izveido Qwilr piedāvājumu."""
+    webhook_url = os.getenv("ZAPIER_WEBHOOK_URL")
 
-    if not api_key:
-        return False, "❌ QWILR_API_KEY nav iestatīts Streamlit Secrets."
-    if not template_id:
-        return False, "❌ QWILR_TEMPLATE_ID nav iestatīts Streamlit Secrets."
-
-    # Debug: pārbauda vai atslēga tiek nolasīta (rāda pirmos 6 simbolus)
-    api_key = api_key.strip()
-    template_id = template_id.strip()
-    debug_info = f"API key garums: {len(api_key)}, sākas ar: '{api_key[:6]}...', Template ID garums: {len(template_id)}"
-
+    if not webhook_url:
+        return False, "❌ ZAPIER_WEBHOOK_URL nav iestatīts Streamlit Secrets."
     if not messages:
         return False, "❌ Čats ir tukšs — nav ko iekļaut piedāvājumā."
 
@@ -287,89 +277,25 @@ def create_qwilr_proposal(messages: list, model_name: str) -> tuple[bool, str]:
     summary = summarize_chat_for_proposal(messages, model_name)
     timestamp = datetime.now().strftime("%d.%m.%Y %H:%M")
 
-    # Veido Qwilr lapu
-    import requests as req
-
-    # Izmēģina visus iespējamos autentifikācijas formātus
-    auth_formats = [
-        f"Bearer {api_key}",
-        f"Token {api_key}",
-        api_key,
-    ]
-
-    last_error = ""
-    for auth_value in auth_formats:
-        headers = {
-            "Authorization": auth_value,
-            "Content-Type": "application/json",
-        }
-
-    substitutions = {
-        "Klients": summary.get("klients", "Nav norādīts"),
-    }
-
+    # Sagatavo datus Zapier webhook
     payload = {
-        "title": f"Horizon piedāvājums — {timestamp}",
-        "templateId": template_id,
-        "published": True,
-        "substitutions": substitutions,
+        "Klients":           summary.get("klients", "Nav norādīts"),
+        "klienta_intereses": summary.get("client_interests", "Nav norādīts"),
+        "moduli":            summary.get("modules", "Nav precizēts"),
+        "galvenie_jautajumi":summary.get("key_questions", "Nav norādīts"),
+        "nakamie_soli":      summary.get("next_steps", "Nav norādīts"),
+        "datums":            timestamp,
+        "nosaukums":         f"Horizon piedāvājums — {timestamp}",
     }
 
+    import requests as req
     try:
-        response = None
-        for auth_value in auth_formats:
-            headers = {
-                "Authorization": auth_value,
-                "Content-Type": "application/json",
-            }
-            response = req.post(
-                "https://api.qwilr.com/v1/pages",
-                headers=headers,
-                json=payload,
-                timeout=15,
-            )
-            if response.status_code != 401:
-                break
-            last_error = f"Auth '{auth_value[:12]}...' → 401"
-
+        response = req.post(webhook_url, json=payload, timeout=15)
         if not response.ok:
-            return False, f"❌ Qwilr kļūda {response.status_code}: {response.text}\n\n🔍 Debug: {debug_info}\nMēģināti formāti: Bearer, Token, raw"
-        data = response.json()
-        page_url = (
-            data.get("viewUrl") or
-            data.get("url") or
-            data.get("link") or
-            data.get("previewUrl") or
-            ""
-        )
-
-        # Nosūta saiti uz e-pastu
-        if target_email and page_url:
-            gmail_user     = os.getenv("GMAIL_USER")
-            gmail_password = os.getenv("GMAIL_APP_PASSWORD")
-            if gmail_user and gmail_password:
-                body = f"Horizon piedāvājums sagatavots {timestamp}\n\n"
-                body += f"Qwilr saite: {page_url}\n\n"
-                body += f"Klienta intereses: {substitutions['klienta_intereses']}\n"
-                body += f"Moduļi: {substitutions['moduli']}\n"
-                body += f"Galvenie jautājumi: {substitutions['galvenie_jautajumi']}\n"
-                body += f"Nākamie soļi: {substitutions['nakamie_soli']}\n"
-
-                from email.mime.text import MIMEText
-                from email.mime.multipart import MIMEMultipart
-                email_msg = MIMEMultipart()
-                email_msg["From"]    = gmail_user
-                email_msg["To"]      = target_email
-                email_msg["Subject"] = f"Horizon Qwilr piedāvājums — {timestamp}"
-                email_msg.attach(MIMEText(body, "plain", "utf-8"))
-                import smtplib
-                with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-                    server.login(gmail_user, gmail_password)
-                    server.send_message(email_msg)
-
-        return True, page_url if page_url else "✅ Piedāvājums izveidots Qwilr."
+            return False, f"❌ Zapier kļūda {response.status_code}: {response.text}"
+        return True, "✅ Dati nosūtīti uz Zapier — Qwilr piedāvājums tiek gatavots!"
     except Exception as e:
-        return False, f"❌ Qwilr kļūda: {str(e)}"
+        return False, f"❌ Kļūda: {str(e)}"
 
 
 # ── Excel eksports ────────────────────────────────────────────────────────────
