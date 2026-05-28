@@ -391,10 +391,11 @@ def send_chat_by_email(messages: list) -> tuple[bool, str]:
 
 # ── Firmas.lv rekvizītu iegūšana ─────────────────────────────────────────────
 
-def fetch_firmas_lv(reg_numurs: str) -> dict:
-    """Iegūst uzņēmuma rekvizītus no firmas.lv pēc reģistrācijas numura."""
+def fetch_firmas_lv(vaicajums: str) -> dict:
+    """Iegūst uzņēmuma rekvizītus no firmas.lv pēc reģ. numura, nosaukuma vai PVN numura."""
     import requests as req
     from bs4 import BeautifulSoup
+    from urllib.parse import quote
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -402,10 +403,12 @@ def fetch_firmas_lv(reg_numurs: str) -> dict:
         "Accept-Language": "lv,en;q=0.9",
     }
 
-    reg_numurs = reg_numurs.strip().replace(" ", "")
+    vaicajums = vaicajums.strip()
+    # PVN numurus normalizē: "LV40003734170" → "40003734170" (firmas.lv meklē bez "LV")
+    meklet = vaicajums.upper().removeprefix("LV") if vaicajums.upper().startswith("LV") and vaicajums[2:].isdigit() else vaicajums
 
-    # 1. Meklē uzņēmumu pēc reģ. numura
-    search_url = f"https://www.firmas.lv/lv/uznemumi/meklet?q={reg_numurs}"
+    # 1. Meklēšana pēc jebkura kritērija
+    search_url = f"https://www.firmas.lv/lv/uznemumi/meklet?q={quote(meklet)}"
     try:
         r = req.get(search_url, headers=headers, timeout=10)
         r.raise_for_status()
@@ -414,25 +417,25 @@ def fetch_firmas_lv(reg_numurs: str) -> dict:
 
     soup = BeautifulSoup(r.text, "html.parser")
 
-    # Atrod pirmo rezultātu sarakstā
+    # Atrod pirmo uzņēmuma saiti rezultātu sarakstā
+    # (izslēdz pakalpojumu lapas, meklēšanas un nav uznemumi sadaļa)
+    IZSLEGT = {"/meklet", "/pakalpojumi", "/par-mums", "/lv/tops",
+               "/lv/personas", "/lv/adreses", "/industrijas"}
     company_url = None
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        if "/uznemumi/" in href and reg_numurs in href:
+        if "/uznemumi/" not in href:
+            continue
+        if any(x in href for x in IZSLEGT):
+            continue
+        # Pārliecinās, ka saite beidzas ar skaitli (reģ. numurs)
+        segmenti = href.rstrip("/").split("/")
+        if segmenti and segmenti[-1].isdigit():
             company_url = "https://www.firmas.lv" + href if href.startswith("/") else href
             break
 
-    # Ja meklēšana neatrada — mēģina tieši pēc numura
     if not company_url:
-        # Mēģina atrast jebkuru uznemumi saiti
-        for a in soup.find_all("a", href=True):
-            if "/uznemumi/" in a["href"] and "/meklet" not in a["href"]:
-                href = a["href"]
-                company_url = "https://www.firmas.lv" + href if href.startswith("/") else href
-                break
-
-    if not company_url:
-        return {"kļūda": f"Uzņēmums ar reģ. nr. {reg_numurs} nav atrasts firmas.lv"}
+        return {"kļūda": f"Uzņēmums '{vaicajums}' nav atrasts firmas.lv"}
 
     # 2. Iegūst uzņēmuma lapu
     try:
@@ -443,9 +446,12 @@ def fetch_firmas_lv(reg_numurs: str) -> dict:
 
     soup2 = BeautifulSoup(r2.text, "html.parser")
 
+    # Reģ. numuru izvelk no URL (pēdējais segments)
+    url_reg = company_url.rstrip("/").split("/")[-1]
+
     rekviziti = {
         "nosaukums":        "",
-        "reg_numurs":       reg_numurs,
+        "reg_numurs":       url_reg,
         "juridiska_adrese": "",
         "pvn_numurs":       "",
         "talrunis":         "",
@@ -483,6 +489,12 @@ def fetch_firmas_lv(reg_numurs: str) -> dict:
                     rekviziti["juridiska_adrese"] = adrese_a.get_text(strip=True)
                 else:
                     rekviziti["juridiska_adrese"] = cells[1].get_text(strip=True, separator=" ")
+
+            elif "reģistrācijas numurs" in label:
+                # "40003734170, 18.03.2005" → paņem tikai numuru
+                reg_val = value.split(",")[0].strip()
+                if reg_val.isdigit():
+                    rekviziti["reg_numurs"] = reg_val
 
             elif "reģistrēts nosaukums" in label:
                 if not rekviziti["nosaukums"]:
@@ -772,13 +784,13 @@ def main():
         st.divider()
         st.header("🏢 Klienta rekvizīti")
         reg_input = st.text_input(
-            "Reģistrācijas numurs:",
-            placeholder="piemēram: 40003193545",
-            key="reg_numurs_input",
+            "Meklēt uzņēmumu:",
+            placeholder="reģ. nr., nosaukums vai PVN nr.",
+            key="firmas_meklet_input",
         )
         if st.button("🔍 Iegūt rekvizītus"):
             if not reg_input.strip():
-                st.warning("⚠️ Ievadi reģistrācijas numuru.")
+                st.warning("⚠️ Ievadi reģistrācijas numuru, nosaukumu vai PVN numuru.")
             else:
                 with st.spinner("Meklē firmas.lv..."):
                     rek = fetch_firmas_lv(reg_input.strip())
