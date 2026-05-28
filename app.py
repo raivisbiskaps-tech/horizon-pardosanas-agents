@@ -405,7 +405,7 @@ def fetch_firmas_lv(reg_numurs: str) -> dict:
     reg_numurs = reg_numurs.strip().replace(" ", "")
 
     # 1. Meklē uzņēmumu pēc reģ. numura
-    search_url = f"https://www.firmas.lv/lv/meklet?q={reg_numurs}"
+    search_url = f"https://www.firmas.lv/lv/uznemumi/meklet?q={reg_numurs}"
     try:
         r = req.get(search_url, headers=headers, timeout=10)
         r.raise_for_status()
