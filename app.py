@@ -442,52 +442,67 @@ def fetch_firmas_lv(reg_numurs: str) -> dict:
         return {"kļūda": f"Nevar ielādēt uzņēmuma lapu: {e}"}
 
     soup2 = BeautifulSoup(r2.text, "html.parser")
-    teksts = soup2.get_text(separator="\n")
-    rindas = [r.strip() for r in teksts.splitlines() if r.strip()]
 
     rekviziti = {
-        "nosaukums":   "",
-        "reg_numurs":  reg_numurs,
+        "nosaukums":        "",
+        "reg_numurs":       reg_numurs,
         "juridiska_adrese": "",
-        "pvn_numurs":  "",
-        "banka":       "",
-        "swift":       "",
-        "konts":       "",
-        "epasts":      "",
-        "talrunis":    "",
-        "url":         company_url,
+        "pvn_numurs":       "",
+        "talrunis":         "",
+        "epasts":           "",
+        "majas_lapa":       "",
+        "url":              company_url,
     }
 
-    # Parsē galvenos laukus
-    for i, rinda in enumerate(rindas):
-        rl = rinda.lower()
-        # Nosaukums — parasti h1 vai pirmais lielais teksts
-        if not rekviziti["nosaukums"]:
-            h1 = soup2.find("h1")
-            if h1:
-                rekviziti["nosaukums"] = h1.get_text(strip=True)
+    # Nosaukums no h1
+    h1 = soup2.find("h1")
+    if h1:
+        rekviziti["nosaukums"] = h1.get_text(strip=True)
 
-        if "juridiskā adrese" in rl or "juridiska adrese" in rl:
-            if i + 1 < len(rindas):
-                rekviziti["juridiska_adrese"] = rindas[i + 1]
-        if "pvn reģ" in rl or "pvn nr" in rl or "pvn:" in rl:
-            if i + 1 < len(rindas):
-                rekviziti["pvn_numurs"] = rindas[i + 1]
-        if "banka" in rl and not rekviziti["banka"]:
-            if i + 1 < len(rindas):
-                rekviziti["banka"] = rindas[i + 1]
-        if "swift" in rl:
-            if i + 1 < len(rindas):
-                rekviziti["swift"] = rindas[i + 1]
-        if ("konts" in rl or "iban" in rl) and not rekviziti["konts"]:
-            if i + 1 < len(rindas):
-                rekviziti["konts"] = rindas[i + 1]
-        if ("e-pasts" in rl or "epasts" in rl or "email" in rl) and not rekviziti["epasts"]:
-            if i + 1 < len(rindas):
-                rekviziti["epasts"] = rindas[i + 1]
-        if ("tālrunis" in rl or "telefons" in rl or "tel." in rl) and not rekviziti["talrunis"]:
-            if i + 1 < len(rindas):
-                rekviziti["talrunis"] = rindas[i + 1]
+    # Parsē "Pamatdati" tabulu — katras rindas pirmā šūna = etiķete, otrā = vērtība
+    # Firmas.lv izmanto <th> etiķetēm un <td> vērtībām
+    for table in soup2.find_all("table"):
+        for tr in table.find_all("tr"):
+            cells = tr.find_all(["th", "td"])
+            if len(cells) < 2:
+                continue
+            label = cells[0].get_text(strip=True).lower()
+            value = cells[1].get_text(strip=True, separator=" ")
+
+            if "pvn numurs" in label or "pvn reģ" in label:
+                # Izvelk tikai "LVxxxxxxxxxx" daļu
+                import re as _re
+                pvn_match = _re.search(r'LV\d+', value)
+                if pvn_match:
+                    rekviziti["pvn_numurs"] = pvn_match.group(0)
+
+            elif "juridiskā adrese" in label or "juridiska adrese" in label:
+                # Adrese ir pirmajā <a> tagā šūnā
+                adrese_a = cells[1].find("a")
+                if adrese_a:
+                    rekviziti["juridiska_adrese"] = adrese_a.get_text(strip=True)
+                else:
+                    rekviziti["juridiska_adrese"] = cells[1].get_text(strip=True, separator=" ")
+
+            elif "reģistrēts nosaukums" in label:
+                if not rekviziti["nosaukums"]:
+                    rekviziti["nosaukums"] = value
+
+    # Kontakti no "Kontakti" sadaļas
+    for a in soup2.find_all("a", href=True):
+        href = a["href"]
+        if href.startswith("tel:") and not rekviziti["talrunis"]:
+            rekviziti["talrunis"] = href.replace("tel:", "").strip()
+        elif href.startswith("mailto:") and not rekviziti["epasts"]:
+            rekviziti["epasts"] = href.replace("mailto:", "").strip()
+        elif (href.startswith("http") and
+              "firmas.lv" not in href and
+              "vid.gov" not in href and
+              "ec.europa" not in href and
+              not rekviziti["majas_lapa"]):
+            teksts_a = a.get_text(strip=True)
+            if teksts_a.startswith("http") or "www." in teksts_a:
+                rekviziti["majas_lapa"] = teksts_a
 
     return rekviziti
 
@@ -780,11 +795,9 @@ def main():
                     ("reg_numurs",       "Reģ. nr."),
                     ("juridiska_adrese", "Juridiskā adrese"),
                     ("pvn_numurs",       "PVN nr."),
-                    ("banka",            "Banka"),
-                    ("swift",            "SWIFT"),
-                    ("konts",            "Konts (IBAN)"),
-                    ("epasts",           "E-pasts"),
                     ("talrunis",         "Tālrunis"),
+                    ("epasts",           "E-pasts"),
+                    ("majas_lapa",       "Mājas lapa"),
                 ]:
                     val = rek.get(atslega, "")
                     if val:
