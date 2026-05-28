@@ -648,20 +648,9 @@ def main():
                 else:
                     st.error(result)
         st.divider()
-        if st.button("📄 Sagatavot Qwilr piedāvājumu"):
-            if not st.session_state.messages:
-                st.warning("⚠️ Uzsāc sarakstes pirms piedāvājuma sagatavošanas.")
-            else:
-                with st.spinner("Sagatavo piedāvājumu..."):
-                    ok, result = create_qwilr_proposal(
-                        st.session_state.messages,
-                        st.session_state.selected_model,
-                    )
-                if ok:
-                    st.success("✅ Piedāvājums sagatavots!")
-                    st.markdown(f"[📄 Atvērt Qwilr]({result})")
-                else:
-                    st.error(result)
+        # Qwilr poga pagaidām paslēpta (API pieejams tikai maksas plānā)
+        # if st.button("📄 Sagatavot Qwilr piedāvājumu"):
+        #     ...
         st.divider()
         if st.button("📧 Nosūtīt sarunu uz e-pastu"):
             ok, msg = send_chat_by_email(st.session_state.messages)
