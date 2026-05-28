@@ -389,6 +389,109 @@ def send_chat_by_email(messages: list) -> tuple[bool, str]:
         return False, f"❌ Sūtīšanas kļūda: {e}"
 
 
+# ── Firmas.lv rekvizītu iegūšana ─────────────────────────────────────────────
+
+def fetch_firmas_lv(reg_numurs: str) -> dict:
+    """Iegūst uzņēmuma rekvizītus no firmas.lv pēc reģistrācijas numura."""
+    import requests as req
+    from bs4 import BeautifulSoup
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "lv,en;q=0.9",
+    }
+
+    reg_numurs = reg_numurs.strip().replace(" ", "")
+
+    # 1. Meklē uzņēmumu pēc reģ. numura
+    search_url = f"https://www.firmas.lv/lv/meklet?q={reg_numurs}"
+    try:
+        r = req.get(search_url, headers=headers, timeout=10)
+        r.raise_for_status()
+    except Exception as e:
+        return {"kļūda": f"Nevar piekļūt firmas.lv: {e}"}
+
+    soup = BeautifulSoup(r.text, "html.parser")
+
+    # Atrod pirmo rezultātu sarakstā
+    company_url = None
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if "/uznemumi/" in href and reg_numurs in href:
+            company_url = "https://www.firmas.lv" + href if href.startswith("/") else href
+            break
+
+    # Ja meklēšana neatrada — mēģina tieši pēc numura
+    if not company_url:
+        # Mēģina atrast jebkuru uznemumi saiti
+        for a in soup.find_all("a", href=True):
+            if "/uznemumi/" in a["href"] and "/meklet" not in a["href"]:
+                href = a["href"]
+                company_url = "https://www.firmas.lv" + href if href.startswith("/") else href
+                break
+
+    if not company_url:
+        return {"kļūda": f"Uzņēmums ar reģ. nr. {reg_numurs} nav atrasts firmas.lv"}
+
+    # 2. Iegūst uzņēmuma lapu
+    try:
+        r2 = req.get(company_url, headers=headers, timeout=10)
+        r2.raise_for_status()
+    except Exception as e:
+        return {"kļūda": f"Nevar ielādēt uzņēmuma lapu: {e}"}
+
+    soup2 = BeautifulSoup(r2.text, "html.parser")
+    teksts = soup2.get_text(separator="\n")
+    rindas = [r.strip() for r in teksts.splitlines() if r.strip()]
+
+    rekviziti = {
+        "nosaukums":   "",
+        "reg_numurs":  reg_numurs,
+        "juridiska_adrese": "",
+        "pvn_numurs":  "",
+        "banka":       "",
+        "swift":       "",
+        "konts":       "",
+        "epasts":      "",
+        "talrunis":    "",
+        "url":         company_url,
+    }
+
+    # Parsē galvenos laukus
+    for i, rinda in enumerate(rindas):
+        rl = rinda.lower()
+        # Nosaukums — parasti h1 vai pirmais lielais teksts
+        if not rekviziti["nosaukums"]:
+            h1 = soup2.find("h1")
+            if h1:
+                rekviziti["nosaukums"] = h1.get_text(strip=True)
+
+        if "juridiskā adrese" in rl or "juridiska adrese" in rl:
+            if i + 1 < len(rindas):
+                rekviziti["juridiska_adrese"] = rindas[i + 1]
+        if "pvn reģ" in rl or "pvn nr" in rl or "pvn:" in rl:
+            if i + 1 < len(rindas):
+                rekviziti["pvn_numurs"] = rindas[i + 1]
+        if "banka" in rl and not rekviziti["banka"]:
+            if i + 1 < len(rindas):
+                rekviziti["banka"] = rindas[i + 1]
+        if "swift" in rl:
+            if i + 1 < len(rindas):
+                rekviziti["swift"] = rindas[i + 1]
+        if ("konts" in rl or "iban" in rl) and not rekviziti["konts"]:
+            if i + 1 < len(rindas):
+                rekviziti["konts"] = rindas[i + 1]
+        if ("e-pasts" in rl or "epasts" in rl or "email" in rl) and not rekviziti["epasts"]:
+            if i + 1 < len(rindas):
+                rekviziti["epasts"] = rindas[i + 1]
+        if ("tālrunis" in rl or "telefons" in rl or "tel." in rl) and not rekviziti["talrunis"]:
+            if i + 1 < len(rindas):
+                rekviziti["talrunis"] = rindas[i + 1]
+
+    return rekviziti
+
+
 # ── Ieviešanas tāme ───────────────────────────────────────────────────────────
 
 # Visi iespējamie bloki — atslēgvārdi no sarakstes → atbilstošās sadaļas šablonā
@@ -651,6 +754,42 @@ def main():
         # st.session_state.selected_model = st.selectbox(...)
         if "selected_model" not in st.session_state:
             st.session_state.selected_model = "🟠 Mistral Small"
+        st.divider()
+        st.header("🏢 Klienta rekvizīti")
+        reg_input = st.text_input(
+            "Reģistrācijas numurs:",
+            placeholder="piemēram: 40003193545",
+            key="reg_numurs_input",
+        )
+        if st.button("🔍 Iegūt rekvizītus"):
+            if not reg_input.strip():
+                st.warning("⚠️ Ievadi reģistrācijas numuru.")
+            else:
+                with st.spinner("Meklē firmas.lv..."):
+                    rek = fetch_firmas_lv(reg_input.strip())
+                if "kļūda" in rek:
+                    st.error(rek["kļūda"])
+                else:
+                    st.session_state.klienta_rekviziti = rek
+                    st.success(f"✅ {rek.get('nosaukums', 'Atrasts!')}")
+        if "klienta_rekviziti" in st.session_state and st.session_state.klienta_rekviziti:
+            rek = st.session_state.klienta_rekviziti
+            with st.expander("📋 Rekvizīti", expanded=True):
+                for atslega, nosaukums in [
+                    ("nosaukums",        "Nosaukums"),
+                    ("reg_numurs",       "Reģ. nr."),
+                    ("juridiska_adrese", "Juridiskā adrese"),
+                    ("pvn_numurs",       "PVN nr."),
+                    ("banka",            "Banka"),
+                    ("swift",            "SWIFT"),
+                    ("konts",            "Konts (IBAN)"),
+                    ("epasts",           "E-pasts"),
+                    ("talrunis",         "Tālrunis"),
+                ]:
+                    val = rek.get(atslega, "")
+                    if val:
+                        st.caption(f"**{nosaukums}:** {val}")
+                st.markdown(f"[🔗 firmas.lv]({rek.get('url', '')})")
         st.divider()
         st.header("ℹ️ Informācija")
         try:
