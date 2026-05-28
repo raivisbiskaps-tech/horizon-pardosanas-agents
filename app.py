@@ -508,23 +508,28 @@ def generate_tame_excel(messages: list, model_name: str) -> tuple[bytes, str]:
 
     # Iestata wrap_text un aprēķina rindu augstumu visām šūnām
     COL_WIDTHS = {1: 18, 2: 22, 3: 60, 4: 16, 5: 12, 6: 14, 7: 18}
-    CHAR_HEIGHT = 13  # pikseļi uz rindu
-    MIN_HEIGHT  = 30
+    # Efektīvais rakstzīmju skaits uz rindu (mazāks nekā kolonnas platums — fonts un padding)
+    EFFECTIVE_CHARS = {1: 15, 2: 18, 3: 48, 4: 13, 5: 10, 6: 11, 7: 15}
+    LINE_HEIGHT = 15  # Excel punkti uz teksta rindu
+    MIN_HEIGHT  = 32
 
     for row in ws.iter_rows():
         max_lines = 1
         for cell in row:
             if cell.value and isinstance(cell.value, str):
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
-                col_width = COL_WIDTHS.get(cell.column, 20)
-                # Aprēķina rindu skaitu — pēc \n un teksta garuma
+                eff_chars = EFFECTIVE_CHARS.get(cell.column, 18)
+                # Sadala pēc \n, tad aprēķina wrapping katrai rindai
                 text_lines = cell.value.split("\n")
-                lines = sum(
-                    max(1, len(line) // col_width + 1)
-                    for line in text_lines
-                )
+                lines = 0
+                for line in text_lines:
+                    line = line.strip()
+                    if line:
+                        lines += max(1, -(-len(line) // eff_chars))  # ceiling division
+                    else:
+                        lines += 1  # tukša rinda
                 max_lines = max(max_lines, lines)
-        row_height = max(MIN_HEIGHT, max_lines * CHAR_HEIGHT)
+        row_height = max(MIN_HEIGHT, max_lines * LINE_HEIGHT)
         ws.row_dimensions[row[0].row].height = row_height
 
     # Iestata kolonnu platumu
