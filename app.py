@@ -506,13 +506,43 @@ def generate_tame_excel(messages: list, model_name: str) -> tuple[bytes, str]:
     for row_idx in reversed(rows_to_delete):
         ws.delete_rows(row_idx)
 
+    # Iestata wrap_text un aprēķina rindu augstumu visām šūnām
+    COL_WIDTHS = {1: 18, 2: 22, 3: 60, 4: 16, 5: 12, 6: 14, 7: 18}
+    CHAR_HEIGHT = 13  # pikseļi uz rindu
+    MIN_HEIGHT  = 30
+
+    for row in ws.iter_rows():
+        max_lines = 1
+        for cell in row:
+            if cell.value and isinstance(cell.value, str):
+                cell.alignment = Alignment(wrap_text=True, vertical="top")
+                col_width = COL_WIDTHS.get(cell.column, 20)
+                # Aprēķina rindu skaitu — pēc \n un teksta garuma
+                text_lines = cell.value.split("\n")
+                lines = sum(
+                    max(1, len(line) // col_width + 1)
+                    for line in text_lines
+                )
+                max_lines = max(max_lines, lines)
+        row_height = max(MIN_HEIGHT, max_lines * CHAR_HEIGHT)
+        ws.row_dimensions[row[0].row].height = row_height
+
+    # Iestata kolonnu platumu
+    for col_idx, width in COL_WIDTHS.items():
+        col_letter = openpyxl.utils.get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].width = width
+
     # Pievieno klienta info virsrakstā (1. rinda pirms tabulas)
     ws.insert_rows(1)
     ws.insert_rows(1)
     ws["A1"] = f"Ieviešanas tāme — {klients}"
     ws["A1"].font = Font(bold=True, size=14)
+    ws["A1"].alignment = Alignment(wrap_text=False)
+    ws.row_dimensions[1].height = 25
     ws["A2"] = f"Sagatavots: {timestamp}"
     ws["A2"].font = Font(italic=True)
+    ws["A2"].alignment = Alignment(wrap_text=False)
+    ws.row_dimensions[2].height = 20
 
     # Saglabā atmiņā
     buf = io.BytesIO()
