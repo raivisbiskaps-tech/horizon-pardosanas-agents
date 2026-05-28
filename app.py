@@ -65,7 +65,18 @@ Stils:
 Tabulas:
 - Ja jautājums ir par izmaksām, cenām, kur atbilde ir apjomīga strukturēta informācija — izmanto Markdown tabulas formātu
 - Tabulas galvenei izmanto treknrakstu (|Modulis|Cena| u.tml.)
-- Ciparus un cenas formatē konsekventi"""
+- Ciparus un cenas formatē konsekventi
+
+Ieviešanas tāme:
+- Ja klients jautā par ieviešanu vai ieviešanas izmaksām, OBLIGĀTI uzdod šos precizējošos jautājumus PIRMS jebkādas tāmes apspriešanas:
+  1. Vai nepieciešama Pamatsistēma (grāmatvedība, rēķini, noliktava)?
+  2. Vai nepieciešams Algu un personāla modulis?
+  3. Vai nepieciešams HOP Personāls (darbinieku pieteikumi, komandējumi, izdevumi, rīkojumi)?
+  4. Vai nepieciešama HOP Darba laika uzskaite?
+  5. Vai nepieciešami HOP Rēķini (rēķinu saskaņošana)?
+  6. Vai nepieciešama NUMO Darba laika plānošana?
+  7. Cik lietotāji strādās sistēmā?
+- Tikai pēc atbildēm informē klientu, ka tāme tiek sagatavota"""
 
 
 # ── Indeksēšana ───────────────────────────────────────────────────────────────
@@ -374,6 +385,137 @@ def send_chat_by_email(messages: list) -> tuple[bool, str]:
         return False, f"❌ Sūtīšanas kļūda: {e}"
 
 
+# ── Ieviešanas tāme ───────────────────────────────────────────────────────────
+
+# Visi iespējamie bloki — atslēgvārdi no sarakstes → atbilstošās sadaļas šablonā
+TAME_BLOCKS = {
+    "instalācija":              ["Instalācija"],
+    "pamatsistēma":             ["Instalācija", "Pamatsistēma"],
+    "grāmatvedība":             ["Instalācija", "Pamatsistēma"],
+    "algas":                    ["Instalācija", "Pamatsistēma"],
+    "personāls":                ["Instalācija", "Pamatsistēma", "Personāls"],
+    "hop personāls":            ["Instalācija", "Pamatsistēma", "Personāls"],
+    "pieteikumi":               ["Personāls"],
+    "komandējumi":              ["Personāls"],
+    "mani izdevumi":            ["Personāls"],
+    "rīkojumi":                 ["Personāls"],
+    "darba laika uzskaite":     ["Personāls"],
+    "hop rēķini":               ["Grāmatvedība +"],
+    "rēķini":                   ["Grāmatvedība +"],
+    "numo":                     ["Numo"],
+    "darba laika plānošana":    ["Numo"],
+}
+
+TAME_CLARIFYING_QUESTIONS = """Ja klients jautā par ieviešanu vai ieviešanas izmaksām, OBLIGĀTI uzdod šos precizējošos jautājumus PIRMS tāmes sagatavošanas:
+1. Vai nepieciešama Pamatsistēma (grāmatvedība, rēķini, noliktava)?
+2. Vai nepieciešams Algu un personāla modulis?
+3. Vai nepieciešams HOP Personāls (darbinieku pieteikumi, komandējumi, izdevumi, rīkojumi)?
+4. Vai nepieciešama HOP Darba laika uzskaite?
+5. Vai nepieciešami HOP Rēķini (rēķinu saskaņošana)?
+6. Vai nepieciešama NUMO Darba laika plānošana?
+7. Cik lietotāji strādās sistēmā?
+Neģenerē tāmi kamēr nav saņemtas atbildes uz šiem jautājumiem."""
+
+
+def determine_tame_sections(messages: list, model_name: str) -> list[str]:
+    """AI nosaka kuras sadaļas iekļaut tāmē, balstoties uz sarakstes."""
+    history_text = ""
+    for msg in messages:
+        role = "Klients" if msg["role"] == "user" else "Aģents"
+        history_text += f"{role}: {msg['content']}\n\n"
+
+    prompt = f"""No šīs sarakstes nosaki, kuras Horizon ieviešanas sadaļas ir nepieciešamas klientam.
+Atbildi TIKAI ar JSON sarakstu no šiem variantiem (iekļauj tikai vajadzīgos):
+["Instalācija", "Pamatsistēma", "Personāls", "Grāmatvedība +", "Numo", "Projekta vadība"]
+
+Noteikumi:
+- "Instalācija" un "Projekta vadība" — vienmēr iekļauj
+- "Pamatsistēma" — iekļauj ja minēta grāmatvedība, uzskaite, pamatsistēma, algas
+- "Personāls" — iekļauj ja minēts personāls, HOP, pieteikumi, komandējumi, rīkojumi, darba laiks
+- "Grāmatvedība +" — iekļauj ja minēti HOP rēķini vai rēķinu saskaņošana
+- "Numo" — iekļauj ja minēta darba laika plānošana vai NUMO
+
+Sarakstes vēsture:
+{history_text}
+
+Atbildi TIKAI JSON formātā, piemēram: ["Instalācija", "Pamatsistēma", "Projekta vadība"]"""
+
+    model_cfg = MODELS[model_name]
+    try:
+        if model_cfg["provider"] == "mistral":
+            client = load_mistral_client()
+        else:
+            client = load_gemini_client()
+        if not client:
+            return ["Instalācija", "Pamatsistēma", "Projekta vadība"]
+
+        response = client.chat.completions.create(
+            model=model_cfg["model"],
+            messages=[{"role": "user", "content": prompt}],
+        )
+        import json
+        text = response.choices[0].message.content.strip()
+        if "```" in text:
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        sections = json.loads(text)
+        # Vienmēr pievieno Instalācija un Projekta vadība
+        for always in ["Instalācija", "Projekta vadība"]:
+            if always not in sections:
+                sections.append(always)
+        return sections
+    except Exception:
+        return ["Instalācija", "Pamatsistēma", "Projekta vadība"]
+
+
+def generate_tame_excel(messages: list, model_name: str) -> tuple[bytes, str]:
+    """Ģenerē ieviešanas tāmi Excel formātā, filtrējot blokus pēc sarakstes."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from copy import copy
+
+    template_path = os.path.join(BASE_DIR, "assets", "tame_template.xlsx")
+    if not os.path.exists(template_path):
+        return None, "❌ Tāmes šablons nav atrasts (assets/tame_template.xlsx)"
+
+    # Nosaka nepieciešamās sadaļas
+    sections = determine_tame_sections(messages, model_name)
+
+    # Iegūst klienta vārdu
+    summary = summarize_chat_for_proposal(messages, model_name)
+    klients = summary.get("klients", "Nav norādīts")
+    timestamp = datetime.now().strftime("%d.%m.%Y")
+
+    # Ielādē šablonu
+    wb = openpyxl.load_workbook(template_path)
+    ws = wb.active
+
+    # Atrod rindas ko dzēst (sadaļa nav iekļauta)
+    rows_to_delete = []
+    for row_idx in range(2, ws.max_row + 1):
+        sadala = ws.cell(row=row_idx, column=1).value
+        if sadala and sadala not in sections:
+            rows_to_delete.append(row_idx)
+
+    # Dzēš rindas no apakšas uz augšu
+    for row_idx in reversed(rows_to_delete):
+        ws.delete_rows(row_idx)
+
+    # Pievieno klienta info virsrakstā (1. rinda pirms tabulas)
+    ws.insert_rows(1)
+    ws.insert_rows(1)
+    ws["A1"] = f"Ieviešanas tāme — {klients}"
+    ws["A1"].font = Font(bold=True, size=14)
+    ws["A2"] = f"Sagatavots: {timestamp}"
+    ws["A2"].font = Font(italic=True)
+
+    # Saglabā atmiņā
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue(), sections
+
+
 # ── Streamlit UI ──────────────────────────────────────────────────────────────
 
 def main():
@@ -479,6 +621,29 @@ def main():
             st.metric("Indeksēti fragmenti", collection.count())
         except Exception:
             pass
+        if st.button("📊 Sagatavot ieviešanas tāmi"):
+            if not st.session_state.messages:
+                st.warning("⚠️ Uzsāc sarakstes pirms tāmes sagatavošanas.")
+            else:
+                with st.spinner("Analizē sarakstes un sagatavo tāmi..."):
+                    excel_bytes, result = generate_tame_excel(
+                        st.session_state.messages,
+                        st.session_state.selected_model,
+                    )
+                if excel_bytes:
+                    sadaļas = ", ".join(result) if isinstance(result, list) else ""
+                    st.success(f"✅ Iekļautās sadaļas: {sadaļas}")
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    st.download_button(
+                        label="📥 Lejupielādēt tāmi",
+                        data=excel_bytes,
+                        file_name=f"horizon_tame_{ts}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="tame_download",
+                    )
+                else:
+                    st.error(result)
+        st.divider()
         if st.button("📄 Sagatavot Qwilr piedāvājumu"):
             if not st.session_state.messages:
                 st.warning("⚠️ Uzsāc sarakstes pirms piedāvājuma sagatavošanas.")
