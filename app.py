@@ -611,14 +611,11 @@ def main():
 
     # Sānjosla
     with st.sidebar:
-        st.header("🤖 AI modelis")
+        # Modeļa izvēle paslēpta — noklusēti Mistral Small
+        # st.header("🤖 AI modelis")
+        # st.session_state.selected_model = st.selectbox(...)
         if "selected_model" not in st.session_state:
-            st.session_state.selected_model = list(MODELS.keys())[0]
-        st.session_state.selected_model = st.selectbox(
-            "Izvēlies modeli:",
-            options=list(MODELS.keys()),
-            index=list(MODELS.keys()).index(st.session_state.selected_model),
-        )
+            st.session_state.selected_model = "🟠 Mistral Small"
         st.divider()
         st.header("ℹ️ Informācija")
         try:
@@ -665,7 +662,7 @@ def main():
             st.cache_resource.clear()
             st.rerun()
         st.divider()
-        st.caption(f"Modelis: {MODELS[st.session_state.selected_model]['model']}")
+        # st.caption(f"Modelis: {MODELS[st.session_state.selected_model]['model']}")
 
 
 if __name__ == "__main__":
