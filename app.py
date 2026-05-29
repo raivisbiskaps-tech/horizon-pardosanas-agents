@@ -626,6 +626,70 @@ Izvelc šādus laukus (ja nav atrodams — atstāj ""):
     return mainīgie
 
 
+_TUKSS   = "_AIZPILDIT_"   # marķieris tukšiem laukiem → dzeltenā iezīmēšana
+_LPP     = "_LPP_"         # marķieris lpp → NUMPAGES lauka kods
+
+
+def _postprocess_ligums(doc_bytes: bytes) -> bytes:
+    """Pēc docxtpl renderēšanas:
+    - aizstāj _AIZPILDIT_ ar dzeltenā iezīmētām atstarpēm
+    - aizstāj _LPP_ ar Word NUMPAGES lauka kodu
+    """
+    from docx import Document
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    from docx.enum.text import WD_COLOR_INDEX
+
+    buf = io.BytesIO(doc_bytes)
+    doc = Document(buf)
+
+    def _numpages_xml(run):
+        """Iestata NUMPAGES lauku dotajā run elementā."""
+        run.text = ""
+        fc_begin = OxmlElement("w:fldChar")
+        fc_begin.set(qn("w:fldCharType"), "begin")
+        instr = OxmlElement("w:instrText")
+        instr.set(qn("xml:space"), "preserve")
+        instr.text = " NUMPAGES "
+        fc_sep = OxmlElement("w:fldChar")
+        fc_sep.set(qn("w:fldCharType"), "separate")
+        fc_end = OxmlElement("w:fldChar")
+        fc_end.set(qn("w:fldCharType"), "end")
+        run._r.extend([fc_begin, instr, fc_sep, fc_end])
+
+    def _process_run(run):
+        if _LPP in run.text:
+            # Aizstāj ar NUMPAGES lauku
+            prefix, suffix = run.text.split(_LPP, 1)
+            run.text = prefix
+            _numpages_xml(run)
+            # Ja pēc marķiera ir teksts — pievieno jaunu run
+            if suffix:
+                new_run = OxmlElement("w:r")
+                new_t = OxmlElement("w:t")
+                new_t.text = suffix
+                new_run.append(new_t)
+                run._r.addnext(new_run)
+        elif _TUKSS in run.text:
+            # Aizstāj ar atstarpēm + dzeltenā fona iezīmēšana
+            run.text = run.text.replace(_TUKSS, "               ")
+            run.font.highlight_color = WD_COLOR_INDEX.YELLOW
+
+    for para in doc.paragraphs:
+        for run in para.runs:
+            _process_run(run)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    for run in para.runs:
+                        _process_run(run)
+
+    buf_out = io.BytesIO()
+    doc.save(buf_out)
+    return buf_out.getvalue()
+
+
 def generate_ligums_docx(messages: list, model_name: str,
                           rekviziti: dict = None) -> tuple:
     """Ģenerē līguma Word dokumentu no docxtpl šablona.
@@ -644,15 +708,27 @@ def generate_ligums_docx(messages: list, model_name: str,
             "Izveido Word dokumentu ar {{ mainīgais }} atzīmēm un saglabā kā assets/liguma_sablons.docx."
         )
 
-    # Izvelk mainīgos
+    # Izvelk mainīgos no sarakstes + rekvizītiem
     mainīgie = extract_liguma_mainīgie(messages, model_name, rekviziti)
+
+    # Sagatavo kontekstu docxtpl: tukšie → marķieris, lpp → LPP marķieris
+    konteksts = {}
+    for k, v in mainīgie.items():
+        if k == "lpp":
+            konteksts[k] = _LPP          # aizstāj ar NUMPAGES pēc renderēšanas
+        elif not v:
+            konteksts[k] = _TUKSS        # aizstāj ar dzeltenā iezīmētu vietu
+        else:
+            konteksts[k] = v
 
     try:
         doc = DocxTemplate(template_path)
-        doc.render(mainīgie)
+        doc.render(konteksts)
         buf = io.BytesIO()
         doc.save(buf)
-        return buf.getvalue(), mainīgie
+        # Pēcapstrāde: dzeltenā iezīmēšana + NUMPAGES lauks
+        doc_bytes = _postprocess_ligums(buf.getvalue())
+        return doc_bytes, mainīgie
     except Exception as e:
         return None, f"❌ Kļūda aizpildot šablonu: {e}"
 
