@@ -1110,14 +1110,24 @@ def main():
             "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
         })
 
+    # Modeļa noklusējums
+    if "selected_model" not in st.session_state:
+        st.session_state.selected_model = "🟠 Mistral Small"
+
     # Sānjosla
     with st.sidebar:
-        # Modeļa izvēle paslēpta — noklusēti Mistral Small
-        # st.header("🤖 AI modelis")
-        # st.session_state.selected_model = st.selectbox(...)
-        if "selected_model" not in st.session_state:
-            st.session_state.selected_model = "🟠 Mistral Small"
+
+        # ── Lietotājs ─────────────────────────────────────────────────────────
+        user = st.session_state.get("authenticated_user", "")
+        st.caption(f"👤 {user}")
+        if st.button("🚪 Izrakstīties"):
+            st.session_state.authenticated      = False
+            st.session_state.authenticated_user = ""
+            st.rerun()
+
         st.divider()
+
+        # ── Klienta rekvizīti ─────────────────────────────────────────────────
         st.header("🏢 Klienta rekvizīti")
         reg_input = st.text_input(
             "Meklēt uzņēmumu:",
@@ -1135,7 +1145,7 @@ def main():
                 else:
                     st.session_state.klienta_rekviziti = rek
                     st.success(f"✅ {rek.get('nosaukums', 'Atrasts!')}")
-        if "klienta_rekviziti" in st.session_state and st.session_state.klienta_rekviziti:
+        if st.session_state.get("klienta_rekviziti"):
             rek = st.session_state.klienta_rekviziti
             with st.expander("📋 Rekvizīti", expanded=True):
                 for atslega, nosaukums in [
@@ -1151,17 +1161,16 @@ def main():
                     if val:
                         st.caption(f"**{nosaukums}:** {val}")
                 st.markdown(f"[🔗 firmas.lv]({rek.get('url', '')})")
+
         st.divider()
-        st.header("ℹ️ Informācija")
-        try:
-            st.metric("Indeksēti fragmenti", collection.count())
-        except Exception:
-            pass
-        if st.button("📊 Sagatavot ieviešanas tāmi"):
+
+        # ── Ieviešanas tāme ───────────────────────────────────────────────────
+        st.header("📊 Ieviešanas tāme")
+        if st.button("Sagatavot tāmi", use_container_width=True):
             if not st.session_state.messages:
                 st.warning("⚠️ Uzsāc sarakstes pirms tāmes sagatavošanas.")
             else:
-                with st.spinner("Analizē sarakstes un sagatavo tāmi..."):
+                with st.spinner("Sagatavo tāmi..."):
                     excel_bytes, result = generate_tame_excel(
                         st.session_state.messages,
                         st.session_state.selected_model,
@@ -1172,12 +1181,11 @@ def main():
                     st.session_state.tame_bytes    = excel_bytes
                     st.session_state.tame_filename = f"horizon_tame_{ts}.xlsx"
                     st.session_state.tame_sadaļas  = sadaļas
-                    st.success(f"✅ Tāme sagatavota. Sadaļas: {sadaļas}")
+                    st.success(f"✅ Sagatavota. Sadaļas: {sadaļas}")
                 else:
                     st.error(result)
         if st.session_state.get("tame_bytes"):
-            st.caption(f"📄 {st.session_state.get('tame_sadaļas', '')}")
-            if st.button("📧 Nosūtīt tāmi pa e-pastu", key="tame_send"):
+            if st.button("📧 Nosūtīt tāmi", use_container_width=True, key="tame_send"):
                 ok, info = send_file_by_email(
                     st.session_state.tame_bytes,
                     st.session_state.tame_filename,
@@ -1189,17 +1197,20 @@ def main():
                     st.success(f"✅ Nosūtīts uz: {info}")
                 else:
                     st.error(f"❌ {info}")
+
         st.divider()
-        if st.button("📝 Sagatavot līgumu"):
+
+        # ── Līgums ────────────────────────────────────────────────────────────
+        st.header("📝 Līgums")
+        if st.button("Sagatavot līgumu", use_container_width=True):
             if not st.session_state.messages:
                 st.warning("⚠️ Uzsāc sarakstes pirms līguma sagatavošanas.")
             else:
-                rekviziti = st.session_state.get("klienta_rekviziti")
-                with st.spinner("Analizē sarakstes un sagatavo līgumu..."):
+                with st.spinner("Sagatavo līgumu..."):
                     doc_bytes, rezultats = generate_ligums_docx(
                         st.session_state.messages,
                         st.session_state.selected_model,
-                        rekviziti,
+                        st.session_state.get("klienta_rekviziti"),
                     )
                 if doc_bytes:
                     klienta_nos = rezultats.get("uznemuma_nosaukums", "") if isinstance(rezultats, dict) else ""
@@ -1212,31 +1223,30 @@ def main():
                     st.error(rezultats)
         if st.session_state.get("ligums_bytes"):
             mainīgie_dict = st.session_state.get("ligums_mainīgie", {})
-            LAUKU_NOSAUKUMI = {
-                "uznemuma_nosaukums":    "Nosaukums",
-                "reg_numurs":            "Reģ. nr.",
-                "pvn_numurs":            "PVN nr.",
-                "juridiska_adrese":      "Juridiskā adrese",
-                "fakt_adrese":           "Faktiskā adrese",
-                "talrunis":              "Tālrunis",
-                "epasts":                "E-pasts",
-                "paraksta":              "Paraksta",
-                "paraksta_amats":        "Parakstītāja amats",
-                "pamat_uz":              "Pamatojums",
-                "kontaktpersona":        "Kontaktpersona",
-                "kontaktpersonas_amats": "Kontaktpersonas amats",
-                "kontaktp_epasts":       "Kontaktpersonas e-pasts",
-                "kontaktp_talrunis":     "Kontaktpersonas tālrunis",
-                "datums":                "Datums",
-                "liguma_numurs":         "Līguma nr.",
-                "lpp":                   "Lappušu skaits",
-            }
             with st.expander("📋 Aizpildītie dati", expanded=False):
                 if isinstance(mainīgie_dict, dict):
-                    for k, label in LAUKU_NOSAUKUMI.items():
+                    for k, label in [
+                        ("uznemuma_nosaukums",    "Nosaukums"),
+                        ("reg_numurs",            "Reģ. nr."),
+                        ("pvn_numurs",            "PVN nr."),
+                        ("juridiska_adrese",      "Juridiskā adrese"),
+                        ("fakt_adrese",           "Faktiskā adrese"),
+                        ("talrunis",              "Tālrunis"),
+                        ("epasts",                "E-pasts"),
+                        ("paraksta",              "Paraksta"),
+                        ("paraksta_amats",        "Parakstītāja amats"),
+                        ("pamat_uz",              "Pamatojums"),
+                        ("kontaktpersona",        "Kontaktpersona"),
+                        ("kontaktpersonas_amats", "Kontaktpersonas amats"),
+                        ("kontaktp_epasts",       "Kontaktpersonas e-pasts"),
+                        ("kontaktp_talrunis",     "Kontaktpersonas tālrunis"),
+                        ("datums",                "Datums"),
+                        ("liguma_numurs",         "Līguma nr."),
+                        ("lpp",                   "Lappušu skaits"),
+                    ]:
                         val = mainīgie_dict.get(k, "")
                         st.caption(f"**{label}:** {val or '—'}")
-            if st.button("📧 Nosūtīt līgumu pa e-pastu", key="ligums_send"):
+            if st.button("📧 Nosūtīt līgumu", use_container_width=True, key="ligums_send"):
                 klienta_nos = mainīgie_dict.get("uznemuma_nosaukums", "") if isinstance(mainīgie_dict, dict) else ""
                 ok, info = send_file_by_email(
                     st.session_state.ligums_bytes,
@@ -1249,12 +1259,11 @@ def main():
                     st.success(f"✅ Nosūtīts uz: {info}")
                 else:
                     st.error(f"❌ {info}")
+
         st.divider()
-        # Qwilr poga pagaidām paslēpta (API pieejams tikai maksas plānā)
-        # if st.button("📄 Sagatavot Qwilr piedāvājumu"):
-        #     ...
-        st.divider()
-        if st.button("📧 Nosūtīt sarunu uz e-pastu"):
+
+        # ── Sarakstes darbības ────────────────────────────────────────────────
+        if st.button("📧 Nosūtīt sarunu uz e-pastu", use_container_width=True):
             ok, msg = send_chat_by_email(
                 st.session_state.messages,
                 st.session_state.get("authenticated_user", ""),
@@ -1263,18 +1272,11 @@ def main():
                 st.success(msg)
             else:
                 st.error(msg)
-        if st.button("🗑️ Notīrīt čatu"):
+        if st.button("🗑️ Notīrīt čatu", use_container_width=True):
             st.session_state.messages = []
             st.rerun()
-        if st.button("🔄 Pārindeksēt dokumentus"):
+        if st.button("🔄 Pārindeksēt dokumentus", use_container_width=True):
             st.cache_resource.clear()
-            st.rerun()
-        st.divider()
-        user = st.session_state.get("authenticated_user", "")
-        st.caption(f"👤 {user}")
-        if st.button("🚪 Izrakstīties"):
-            st.session_state.authenticated      = False
-            st.session_state.authenticated_user = ""
             st.rerun()
 
 
