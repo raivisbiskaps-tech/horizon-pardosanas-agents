@@ -519,6 +519,137 @@ def fetch_firmas_lv(vaicajums: str) -> dict:
     return rekviziti
 
 
+# ── Līguma sagatavošana ───────────────────────────────────────────────────────
+
+# Šie mainīgo nosaukumi jālieto Word šablonā: {{ mainīgā_nosaukums }}
+LIGUMA_MAINĪGIE_NOKLUSĒJUMS = {
+    # Klienta rekvizīti
+    "klienta_nosaukums":     "",   # {{ klienta_nosaukums }}
+    "reg_numurs":            "",   # {{ reg_numurs }}
+    "pvn_numurs":            "",   # {{ pvn_numurs }}
+    "juridiska_adrese":      "",   # {{ juridiska_adrese }}
+    "talrunis":              "",   # {{ talrunis }}
+    "epasts":                "",   # {{ epasts }}
+    # Kontaktpersona (no sarakstes)
+    "kontaktpersona":        "",   # {{ kontaktpersona }}
+    "kontaktpersonas_amats": "",   # {{ kontaktpersonas_amats }}
+    # Pakalpojumi (no sarakstes)
+    "pakalpojumi":           "",   # {{ pakalpojumi }}
+    "lietotaju_skaits":      "",   # {{ lietotaju_skaits }}
+    "ieviešanas_laiks":      "",   # {{ ieviesanas_laiks }}
+    # Līguma dati
+    "datums":                "",   # {{ datums }}
+    "liguma_numurs":         "",   # {{ liguma_numurs }}
+}
+
+
+def extract_liguma_mainīgie(messages: list, model_name: str, rekviziti: dict = None) -> dict:
+    """Izvelk līguma aizpildīšanai nepieciešamos mainīgos no sarakstes un rekvizītiem."""
+    import json as _json
+
+    mainīgie = dict(LIGUMA_MAINĪGIE_NOKLUSĒJUMS)
+    mainīgie["datums"] = datetime.now().strftime("%d.%m.%Y")
+
+    # 1. Aizpilda no firmas.lv rekvizītiem (ja ir)
+    if rekviziti:
+        mainīgie.update({
+            "klienta_nosaukums": rekviziti.get("nosaukums", ""),
+            "reg_numurs":        rekviziti.get("reg_numurs", ""),
+            "pvn_numurs":        rekviziti.get("pvn_numurs", ""),
+            "juridiska_adrese":  rekviziti.get("juridiska_adrese", ""),
+            "talrunis":          rekviziti.get("talrunis", ""),
+            "epasts":            rekviziti.get("epasts", ""),
+        })
+
+    if not messages:
+        return mainīgie
+
+    # 2. AI izvelk trūkstošo info no sarakstes
+    history_text = "\n".join([
+        f"{'Klients' if m['role'] == 'user' else 'Aģents'}: {m['content']}"
+        for m in messages
+    ])
+
+    jau_zinami = {k: v for k, v in mainīgie.items() if v}
+    jau_zinami_teksts = "\n".join(f"  {k}: {v}" for k, v in jau_zinami.items()) or "  (nekas nav zināms)"
+
+    prompt = f"""No šīs pārdošanas sarakstes izvelc informāciju līgumam. Atbildi TIKAI ar JSON objektu, bez papildu teksta.
+
+Sarakstes vēsture:
+{history_text[-4000:]}
+
+Jau zināmie dati (neaizstāj ar tukšiem!):
+{jau_zinami_teksts}
+
+Izvelc šādus laukus (ja nav atrodams — atstāj ""):
+{{
+  "klienta_nosaukums": "uzņēmuma nosaukums",
+  "kontaktpersona": "kontaktpersonas vārds, uzvārds",
+  "kontaktpersonas_amats": "kontaktpersonas amats",
+  "pakalpojumi": "saraksts ar Horizon moduļiem/pakalpojumiem, par ko vienojās vai interesējas",
+  "lietotaju_skaits": "plānotais lietotāju skaits sistēmā",
+  "ieviešanas_laiks": "aptuvenais ieviešanas laiks vai termiņš",
+  "reg_numurs": "reģistrācijas numurs, ja minēts"
+}}"""
+
+    model_cfg = MODELS[model_name]
+    try:
+        if model_cfg["provider"] == "mistral":
+            client = load_mistral_client()
+        else:
+            client = load_gemini_client()
+        if not client:
+            return mainīgie
+
+        response = client.chat.completions.create(
+            model=model_cfg["model"],
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = response.choices[0].message.content.strip()
+        # Izņem JSON no atbildes (arī ja ietīts ```json ... ```)
+        json_match = re.search(r'\{[^{}]*\}', text, re.DOTALL)
+        if json_match:
+            extracted = _json.loads(json_match.group(0))
+            for k, v in extracted.items():
+                if v and k in mainīgie and not mainīgie.get(k):
+                    mainīgie[k] = str(v)
+    except Exception:
+        pass
+
+    return mainīgie
+
+
+def generate_ligums_docx(messages: list, model_name: str,
+                          rekviziti: dict = None) -> tuple:
+    """Ģenerē līguma Word dokumentu no docxtpl šablona.
+
+    Atgriež: (bytes, mainīgie_dict) ja veiksmīgi, (None, kļūdas_teksts) ja neizdevās.
+    """
+    try:
+        from docxtpl import DocxTemplate
+    except ImportError:
+        return None, "❌ docxtpl nav instalēts. Pievieno 'docxtpl' requirements.txt un pārinstallē."
+
+    template_path = os.path.join(BASE_DIR, "assets", "liguma_sablons.docx")
+    if not os.path.exists(template_path):
+        return None, (
+            "❌ Šablons nav atrasts (assets/liguma_sablons.docx).\n"
+            "Izveido Word dokumentu ar {{ mainīgais }} atzīmēm un saglabā kā assets/liguma_sablons.docx."
+        )
+
+    # Izvelk mainīgos
+    mainīgie = extract_liguma_mainīgie(messages, model_name, rekviziti)
+
+    try:
+        doc = DocxTemplate(template_path)
+        doc.render(mainīgie)
+        buf = io.BytesIO()
+        doc.save(buf)
+        return buf.getvalue(), mainīgie
+    except Exception as e:
+        return None, f"❌ Kļūda aizpildot šablonu: {e}"
+
+
 # ── Ieviešanas tāme ───────────────────────────────────────────────────────────
 
 # Visi iespējamie bloki — atslēgvārdi no sarakstes → atbilstošās sadaļas šablonā
@@ -843,6 +974,54 @@ def main():
                     )
                 else:
                     st.error(result)
+        st.divider()
+        if st.button("📝 Sagatavot līgumu"):
+            if not st.session_state.messages:
+                st.warning("⚠️ Uzsāc sarakstes pirms līguma sagatavošanas.")
+            else:
+                rekviziti = st.session_state.get("klienta_rekviziti")
+                with st.spinner("Analizē sarakstes un sagatavo līgumu..."):
+                    doc_bytes, rezultats = generate_ligums_docx(
+                        st.session_state.messages,
+                        st.session_state.selected_model,
+                        rekviziti,
+                    )
+                if doc_bytes:
+                    st.session_state.ligums_bytes    = doc_bytes
+                    st.session_state.ligums_mainīgie = rezultats
+                else:
+                    st.error(rezultats)
+        if st.session_state.get("ligums_bytes"):
+            mainīgie_dict = st.session_state.get("ligums_mainīgie", {})
+            klienta_nos   = mainīgie_dict.get("klienta_nosaukums", "ligums") if isinstance(mainīgie_dict, dict) else "ligums"
+            ts = datetime.now().strftime("%Y%m%d")
+            with st.expander("📋 Aizpildītie dati", expanded=False):
+                if isinstance(mainīgie_dict, dict):
+                    LAUKU_NOSAUKUMI = {
+                        "klienta_nosaukums":     "Nosaukums",
+                        "reg_numurs":            "Reģ. nr.",
+                        "pvn_numurs":            "PVN nr.",
+                        "juridiska_adrese":      "Adrese",
+                        "talrunis":              "Tālrunis",
+                        "epasts":                "E-pasts",
+                        "kontaktpersona":        "Kontaktpersona",
+                        "kontaktpersonas_amats": "Amats",
+                        "pakalpojumi":           "Pakalpojumi",
+                        "lietotaju_skaits":      "Lietotāji",
+                        "ieviešanas_laiks":      "Ieviešanas laiks",
+                        "datums":                "Datums",
+                        "liguma_numurs":         "Līguma nr.",
+                    }
+                    for k, label in LAUKU_NOSAUKUMI.items():
+                        val = mainīgie_dict.get(k, "")
+                        st.caption(f"**{label}:** {val or '—'}")
+            st.download_button(
+                label="📥 Lejupielādēt līgumu",
+                data=st.session_state.ligums_bytes,
+                file_name=f"horizon_ligums_{klienta_nos}_{ts}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                key="ligums_download",
+            )
         st.divider()
         # Qwilr poga pagaidām paslēpta (API pieejams tikai maksas plānā)
         # if st.button("📄 Sagatavot Qwilr piedāvājumu"):
