@@ -351,22 +351,67 @@ def tables_to_excel_bytes(tables: list[pd.DataFrame]) -> bytes:
 
 # ── E-pasta sūtīšana ─────────────────────────────────────────────────────────
 
+def _email_recipients(user_email: str = "") -> list[str]:
+    """Atgriež saņēmēju sarakstu: TARGET_EMAIL + pieslēgtais lietotājs (ja atšķiras)."""
+    target = os.getenv("TARGET_EMAIL", "")
+    recipients = [target] if target else []
+    if user_email and user_email.lower() not in [r.lower() for r in recipients]:
+        recipients.append(user_email)
+    return recipients
+
+
+def send_file_by_email(
+    file_bytes: bytes,
+    filename: str,
+    subject: str,
+    body: str,
+    user_email: str = "",
+) -> tuple[bool, str]:
+    """Nosūta failu kā e-pasta pielikumu uz TARGET_EMAIL un pieslēgtā lietotāja e-pastu."""
+    from email.mime.base import MIMEBase
+    from email import encoders
+
+    gmail_user     = os.getenv("GMAIL_USER")
+    gmail_password = os.getenv("GMAIL_APP_PASSWORD")
+    recipients     = _email_recipients(user_email)
+
+    if not all([gmail_user, gmail_password]) or not recipients:
+        return False, "❌ Nav iestatīti e-pasta mainīgie."
+
+    email_msg = MIMEMultipart()
+    email_msg["From"]    = gmail_user
+    email_msg["To"]      = ", ".join(recipients)
+    email_msg["Subject"] = subject
+    email_msg.attach(MIMEText(body, "plain", "utf-8"))
+
+    # Pielikums
+    part = MIMEBase("application", "octet-stream")
+    part.set_payload(file_bytes)
+    encoders.encode_base64(part)
+    part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
+    email_msg.attach(part)
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(gmail_user, gmail_password)
+            server.sendmail(gmail_user, recipients, email_msg.as_string())
+        return True, ", ".join(recipients)
+    except Exception as e:
+        return False, str(e)
+
 def send_chat_by_email(messages: list, user_email: str = "") -> tuple[bool, str]:
     """Nosūta čata vēsturi uz TARGET_EMAIL un pieslēgtā lietotāja e-pastu."""
     gmail_user     = os.getenv("GMAIL_USER")
     gmail_password = os.getenv("GMAIL_APP_PASSWORD")
     target_email   = os.getenv("TARGET_EMAIL")
 
-    if not all([gmail_user, gmail_password, target_email]):
+    recipients = _email_recipients(user_email)
+
+    if not all([gmail_user, gmail_password]) or not recipients:
         return False, "❌ Nav iestatīti e-pasta mainīgie (GMAIL_USER, GMAIL_APP_PASSWORD, TARGET_EMAIL)."
 
     if not messages:
         return False, "❌ Čats ir tukšs — nav ko sūtīt."
-
-    # Saņēmēju saraksts: TARGET_EMAIL + pieslēgtais lietotājs (ja atšķiras)
-    recipients = [target_email]
-    if user_email and user_email.lower() != target_email.lower():
-        recipients.append(user_email)
 
     # Veido e-pasta saturu
     timestamp = datetime.now().strftime("%d.%m.%Y %H:%M")
@@ -1125,13 +1170,24 @@ def main():
                     sadaļas = ", ".join(result) if isinstance(result, list) else ""
                     st.success(f"✅ Iekļautās sadaļas: {sadaļas}")
                     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"horizon_tame_{ts}.xlsx"
                     st.download_button(
                         label="📥 Lejupielādēt tāmi",
                         data=excel_bytes,
-                        file_name=f"horizon_tame_{ts}.xlsx",
+                        file_name=filename,
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="tame_download",
                     )
+                    ok, info = send_file_by_email(
+                        excel_bytes, filename,
+                        subject=f"Horizon ieviešanas tāme — {datetime.now().strftime('%d.%m.%Y')}",
+                        body=f"Pielikumā ieviešanas tāme.\nIekļautās sadaļas: {sadaļas}",
+                        user_email=st.session_state.get("authenticated_user", ""),
+                    )
+                    if ok:
+                        st.caption(f"📧 Nosūtīts uz: {info}")
+                    else:
+                        st.caption(f"⚠️ E-pasts netika nosūtīts: {info}")
                 else:
                     st.error(result)
         st.divider()
@@ -1149,6 +1205,20 @@ def main():
                 if doc_bytes:
                     st.session_state.ligums_bytes    = doc_bytes
                     st.session_state.ligums_mainīgie = rezultats
+                    klienta_nos = rezultats.get("uznemuma_nosaukums", "") if isinstance(rezultats, dict) else ""
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"horizon_ligums_{klienta_nos or ts}.docx"
+                    ok, info = send_file_by_email(
+                        doc_bytes, filename,
+                        subject=f"Horizon līgums — {klienta_nos or datetime.now().strftime('%d.%m.%Y')}",
+                        body=f"Pielikumā sagatavotais līgums{f' — {klienta_nos}' if klienta_nos else ''}.",
+                        user_email=st.session_state.get("authenticated_user", ""),
+                    )
+                    if ok:
+                        st.success(f"✅ Līgums sagatavots un nosūtīts uz: {info}")
+                    else:
+                        st.success("✅ Līgums sagatavots.")
+                        st.caption(f"⚠️ E-pasts netika nosūtīts: {info}")
                 else:
                     st.error(rezultats)
         if st.session_state.get("ligums_bytes"):
