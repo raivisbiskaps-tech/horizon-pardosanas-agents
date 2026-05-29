@@ -1121,6 +1121,12 @@ def main():
         user = st.session_state.get("authenticated_user", "")
         st.caption(f"👤 {user}")
         if st.button("🚪 Izrakstīties"):
+            if st.session_state.get("messages"):
+                send_chat_by_email(
+                    st.session_state.messages,
+                    st.session_state.get("authenticated_user", ""),
+                )
+            st.session_state.messages           = []
             st.session_state.authenticated      = False
             st.session_state.authenticated_user = ""
             st.rerun()
