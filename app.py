@@ -523,23 +523,27 @@ def fetch_firmas_lv(vaicajums: str) -> dict:
 
 # Šie mainīgo nosaukumi jālieto Word šablonā: {{ mainīgā_nosaukums }}
 LIGUMA_MAINĪGIE_NOKLUSĒJUMS = {
-    # Klienta rekvizīti
-    "klienta_nosaukums":     "",   # {{ klienta_nosaukums }}
+    # Klienta rekvizīti (daļēji no firmas.lv)
+    "uznemuma_nosaukums":    "",   # {{ uznemuma_nosaukums }}
     "reg_numurs":            "",   # {{ reg_numurs }}
     "pvn_numurs":            "",   # {{ pvn_numurs }}
     "juridiska_adrese":      "",   # {{ juridiska_adrese }}
+    "fakt_adrese":           "",   # {{ fakt_adrese }}
     "talrunis":              "",   # {{ talrunis }}
     "epasts":                "",   # {{ epasts }}
+    # Parakstītājs (no sarakstes)
+    "paraksta":              "",   # {{ paraksta }}
+    "paraksta_amats":        "",   # {{ paraksta_amats }}
+    "pamat_uz":              "",   # {{ pamat_uz }} — statūti / prokūra / pilnvara
     # Kontaktpersona (no sarakstes)
     "kontaktpersona":        "",   # {{ kontaktpersona }}
     "kontaktpersonas_amats": "",   # {{ kontaktpersonas_amats }}
-    # Pakalpojumi (no sarakstes)
-    "pakalpojumi":           "",   # {{ pakalpojumi }}
-    "lietotaju_skaits":      "",   # {{ lietotaju_skaits }}
-    "ieviešanas_laiks":      "",   # {{ ieviesanas_laiks }}
+    "kontaktp_epasts":       "",   # {{ kontaktp_epasts }}
+    "kontaktp_talrunis":     "",   # {{ kontaktp_talrunis }}
     # Līguma dati
-    "datums":                "",   # {{ datums }}
-    "liguma_numurs":         "",   # {{ liguma_numurs }}
+    "datums":                "",   # {{ datums }} — aizpildās automātiski
+    "liguma_numurs":         "",   # {{ liguma_numurs }} — jāaizpilda manuāli
+    "lpp":                   "",   # {{ lpp }} — lappušu skaits, jāaizpilda manuāli
 }
 
 
@@ -553,12 +557,12 @@ def extract_liguma_mainīgie(messages: list, model_name: str, rekviziti: dict = 
     # 1. Aizpilda no firmas.lv rekvizītiem (ja ir)
     if rekviziti:
         mainīgie.update({
-            "klienta_nosaukums": rekviziti.get("nosaukums", ""),
-            "reg_numurs":        rekviziti.get("reg_numurs", ""),
-            "pvn_numurs":        rekviziti.get("pvn_numurs", ""),
-            "juridiska_adrese":  rekviziti.get("juridiska_adrese", ""),
-            "talrunis":          rekviziti.get("talrunis", ""),
-            "epasts":            rekviziti.get("epasts", ""),
+            "uznemuma_nosaukums": rekviziti.get("nosaukums", ""),
+            "reg_numurs":         rekviziti.get("reg_numurs", ""),
+            "pvn_numurs":         rekviziti.get("pvn_numurs", ""),
+            "juridiska_adrese":   rekviziti.get("juridiska_adrese", ""),
+            "talrunis":           rekviziti.get("talrunis", ""),
+            "epasts":             rekviziti.get("epasts", ""),
         })
 
     if not messages:
@@ -583,12 +587,15 @@ Jau zināmie dati (neaizstāj ar tukšiem!):
 
 Izvelc šādus laukus (ja nav atrodams — atstāj ""):
 {{
-  "klienta_nosaukums": "uzņēmuma nosaukums",
+  "uznemuma_nosaukums": "uzņēmuma pilnais nosaukums",
+  "paraksta": "personas vārds, uzvārds, kas parakstīs līgumu",
+  "paraksta_amats": "parakstītāja amats",
+  "pamat_uz": "paraksta pamatojoties uz (piemēram: statūtiem, prokūru, pilnvaru Nr. X)",
+  "fakt_adrese": "faktiskā adrese, ja atšķiras no juridiskās",
   "kontaktpersona": "kontaktpersonas vārds, uzvārds",
   "kontaktpersonas_amats": "kontaktpersonas amats",
-  "pakalpojumi": "saraksts ar Horizon moduļiem/pakalpojumiem, par ko vienojās vai interesējas",
-  "lietotaju_skaits": "plānotais lietotāju skaits sistēmā",
-  "ieviešanas_laiks": "aptuvenais ieviešanas laiks vai termiņš",
+  "kontaktp_epasts": "kontaktpersonas e-pasts",
+  "kontaktp_talrunis": "kontaktpersonas tālrunis",
   "reg_numurs": "reģistrācijas numurs, ja minēts"
 }}"""
 
@@ -998,19 +1005,23 @@ def main():
             with st.expander("📋 Aizpildītie dati", expanded=False):
                 if isinstance(mainīgie_dict, dict):
                     LAUKU_NOSAUKUMI = {
-                        "klienta_nosaukums":     "Nosaukums",
+                        "uznemuma_nosaukums":    "Nosaukums",
                         "reg_numurs":            "Reģ. nr.",
                         "pvn_numurs":            "PVN nr.",
-                        "juridiska_adrese":      "Adrese",
+                        "juridiska_adrese":      "Juridiskā adrese",
+                        "fakt_adrese":           "Faktiskā adrese",
                         "talrunis":              "Tālrunis",
                         "epasts":                "E-pasts",
+                        "paraksta":              "Paraksta",
+                        "paraksta_amats":        "Parakstītāja amats",
+                        "pamat_uz":              "Pamatojums",
                         "kontaktpersona":        "Kontaktpersona",
-                        "kontaktpersonas_amats": "Amats",
-                        "pakalpojumi":           "Pakalpojumi",
-                        "lietotaju_skaits":      "Lietotāji",
-                        "ieviešanas_laiks":      "Ieviešanas laiks",
+                        "kontaktpersonas_amats": "Kontaktpersonas amats",
+                        "kontaktp_epasts":       "Kontaktpersonas e-pasts",
+                        "kontaktp_talrunis":     "Kontaktpersonas tālrunis",
                         "datums":                "Datums",
                         "liguma_numurs":         "Līguma nr.",
+                        "lpp":                   "Lappušu skaits",
                     }
                     for k, label in LAUKU_NOSAUKUMI.items():
                         val = mainīgie_dict.get(k, "")
