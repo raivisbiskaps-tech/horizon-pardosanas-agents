@@ -1168,28 +1168,27 @@ def main():
                     )
                 if excel_bytes:
                     sadaļas = ", ".join(result) if isinstance(result, list) else ""
-                    st.success(f"✅ Iekļautās sadaļas: {sadaļas}")
                     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    filename = f"horizon_tame_{ts}.xlsx"
-                    st.download_button(
-                        label="📥 Lejupielādēt tāmi",
-                        data=excel_bytes,
-                        file_name=filename,
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="tame_download",
-                    )
-                    ok, info = send_file_by_email(
-                        excel_bytes, filename,
-                        subject=f"Horizon ieviešanas tāme — {datetime.now().strftime('%d.%m.%Y')}",
-                        body=f"Pielikumā ieviešanas tāme.\nIekļautās sadaļas: {sadaļas}",
-                        user_email=st.session_state.get("authenticated_user", ""),
-                    )
-                    if ok:
-                        st.caption(f"📧 Nosūtīts uz: {info}")
-                    else:
-                        st.caption(f"⚠️ E-pasts netika nosūtīts: {info}")
+                    st.session_state.tame_bytes    = excel_bytes
+                    st.session_state.tame_filename = f"horizon_tame_{ts}.xlsx"
+                    st.session_state.tame_sadaļas  = sadaļas
+                    st.success(f"✅ Tāme sagatavota. Sadaļas: {sadaļas}")
                 else:
                     st.error(result)
+        if st.session_state.get("tame_bytes"):
+            st.caption(f"📄 {st.session_state.get('tame_sadaļas', '')}")
+            if st.button("📧 Nosūtīt tāmi pa e-pastu", key="tame_send"):
+                ok, info = send_file_by_email(
+                    st.session_state.tame_bytes,
+                    st.session_state.tame_filename,
+                    subject=f"Horizon ieviešanas tāme — {datetime.now().strftime('%d.%m.%Y')}",
+                    body=f"Pielikumā ieviešanas tāme.\nIekļautās sadaļas: {st.session_state.get('tame_sadaļas', '')}",
+                    user_email=st.session_state.get("authenticated_user", ""),
+                )
+                if ok:
+                    st.success(f"✅ Nosūtīts uz: {info}")
+                else:
+                    st.error(f"❌ {info}")
         st.divider()
         if st.button("📝 Sagatavot līgumu"):
             if not st.session_state.messages:
@@ -1203,59 +1202,53 @@ def main():
                         rekviziti,
                     )
                 if doc_bytes:
-                    st.session_state.ligums_bytes    = doc_bytes
-                    st.session_state.ligums_mainīgie = rezultats
                     klienta_nos = rezultats.get("uznemuma_nosaukums", "") if isinstance(rezultats, dict) else ""
                     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    filename = f"horizon_ligums_{klienta_nos or ts}.docx"
-                    ok, info = send_file_by_email(
-                        doc_bytes, filename,
-                        subject=f"Horizon līgums — {klienta_nos or datetime.now().strftime('%d.%m.%Y')}",
-                        body=f"Pielikumā sagatavotais līgums{f' — {klienta_nos}' if klienta_nos else ''}.",
-                        user_email=st.session_state.get("authenticated_user", ""),
-                    )
-                    if ok:
-                        st.success(f"✅ Līgums sagatavots un nosūtīts uz: {info}")
-                    else:
-                        st.success("✅ Līgums sagatavots.")
-                        st.caption(f"⚠️ E-pasts netika nosūtīts: {info}")
+                    st.session_state.ligums_bytes    = doc_bytes
+                    st.session_state.ligums_mainīgie = rezultats
+                    st.session_state.ligums_filename = f"horizon_ligums_{klienta_nos or ts}.docx"
+                    st.success("✅ Līgums sagatavots.")
                 else:
                     st.error(rezultats)
         if st.session_state.get("ligums_bytes"):
             mainīgie_dict = st.session_state.get("ligums_mainīgie", {})
-            klienta_nos   = mainīgie_dict.get("klienta_nosaukums", "ligums") if isinstance(mainīgie_dict, dict) else "ligums"
-            ts = datetime.now().strftime("%Y%m%d")
+            LAUKU_NOSAUKUMI = {
+                "uznemuma_nosaukums":    "Nosaukums",
+                "reg_numurs":            "Reģ. nr.",
+                "pvn_numurs":            "PVN nr.",
+                "juridiska_adrese":      "Juridiskā adrese",
+                "fakt_adrese":           "Faktiskā adrese",
+                "talrunis":              "Tālrunis",
+                "epasts":                "E-pasts",
+                "paraksta":              "Paraksta",
+                "paraksta_amats":        "Parakstītāja amats",
+                "pamat_uz":              "Pamatojums",
+                "kontaktpersona":        "Kontaktpersona",
+                "kontaktpersonas_amats": "Kontaktpersonas amats",
+                "kontaktp_epasts":       "Kontaktpersonas e-pasts",
+                "kontaktp_talrunis":     "Kontaktpersonas tālrunis",
+                "datums":                "Datums",
+                "liguma_numurs":         "Līguma nr.",
+                "lpp":                   "Lappušu skaits",
+            }
             with st.expander("📋 Aizpildītie dati", expanded=False):
                 if isinstance(mainīgie_dict, dict):
-                    LAUKU_NOSAUKUMI = {
-                        "uznemuma_nosaukums":    "Nosaukums",
-                        "reg_numurs":            "Reģ. nr.",
-                        "pvn_numurs":            "PVN nr.",
-                        "juridiska_adrese":      "Juridiskā adrese",
-                        "fakt_adrese":           "Faktiskā adrese",
-                        "talrunis":              "Tālrunis",
-                        "epasts":                "E-pasts",
-                        "paraksta":              "Paraksta",
-                        "paraksta_amats":        "Parakstītāja amats",
-                        "pamat_uz":              "Pamatojums",
-                        "kontaktpersona":        "Kontaktpersona",
-                        "kontaktpersonas_amats": "Kontaktpersonas amats",
-                        "kontaktp_epasts":       "Kontaktpersonas e-pasts",
-                        "kontaktp_talrunis":     "Kontaktpersonas tālrunis",
-                        "datums":                "Datums",
-                        "liguma_numurs":         "Līguma nr.",
-                        "lpp":                   "Lappušu skaits",
-                    }
                     for k, label in LAUKU_NOSAUKUMI.items():
                         val = mainīgie_dict.get(k, "")
                         st.caption(f"**{label}:** {val or '—'}")
-            st.download_button(
-                label="📥 Lejupielādēt līgumu",
-                data=st.session_state.ligums_bytes,
-                file_name=f"horizon_ligums_{klienta_nos}_{ts}.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                key="ligums_download",
-            )
+            if st.button("📧 Nosūtīt līgumu pa e-pastu", key="ligums_send"):
+                klienta_nos = mainīgie_dict.get("uznemuma_nosaukums", "") if isinstance(mainīgie_dict, dict) else ""
+                ok, info = send_file_by_email(
+                    st.session_state.ligums_bytes,
+                    st.session_state.ligums_filename,
+                    subject=f"Horizon līgums — {klienta_nos or datetime.now().strftime('%d.%m.%Y')}",
+                    body=f"Pielikumā sagatavotais līgums{f' — {klienta_nos}' if klienta_nos else ''}.",
+                    user_email=st.session_state.get("authenticated_user", ""),
+                )
+                if ok:
+                    st.success(f"✅ Nosūtīts uz: {info}")
+                else:
+                    st.error(f"❌ {info}")
         st.divider()
         # Qwilr poga pagaidām paslēpta (API pieejams tikai maksas plānā)
         # if st.button("📄 Sagatavot Qwilr piedāvājumu"):
