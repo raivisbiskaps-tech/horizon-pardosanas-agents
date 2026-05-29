@@ -351,8 +351,8 @@ def tables_to_excel_bytes(tables: list[pd.DataFrame]) -> bytes:
 
 # ── E-pasta sūtīšana ─────────────────────────────────────────────────────────
 
-def send_chat_by_email(messages: list) -> tuple[bool, str]:
-    """Nosūta čata vēsturi uz e-pastu caur Gmail."""
+def send_chat_by_email(messages: list, user_email: str = "") -> tuple[bool, str]:
+    """Nosūta čata vēsturi uz TARGET_EMAIL un pieslēgtā lietotāja e-pastu."""
     gmail_user     = os.getenv("GMAIL_USER")
     gmail_password = os.getenv("GMAIL_APP_PASSWORD")
     target_email   = os.getenv("TARGET_EMAIL")
@@ -363,9 +363,16 @@ def send_chat_by_email(messages: list) -> tuple[bool, str]:
     if not messages:
         return False, "❌ Čats ir tukšs — nav ko sūtīt."
 
+    # Saņēmēju saraksts: TARGET_EMAIL + pieslēgtais lietotājs (ja atšķiras)
+    recipients = [target_email]
+    if user_email and user_email.lower() != target_email.lower():
+        recipients.append(user_email)
+
     # Veido e-pasta saturu
     timestamp = datetime.now().strftime("%d.%m.%Y %H:%M")
     body = f"Horizon pārdošanas aģents — saruna {timestamp}\n"
+    if user_email:
+        body += f"Lietotājs: {user_email}\n"
     body += "=" * 60 + "\n\n"
 
     for msg in messages:
@@ -376,15 +383,16 @@ def send_chat_by_email(messages: list) -> tuple[bool, str]:
     # Veido e-pastu
     email_msg = MIMEMultipart()
     email_msg["From"]    = gmail_user
-    email_msg["To"]      = target_email
+    email_msg["To"]      = ", ".join(recipients)
     email_msg["Subject"] = f"Horizon aģents — saruna {timestamp}"
     email_msg.attach(MIMEText(body, "plain", "utf-8"))
 
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(gmail_user, gmail_password)
-            server.send_message(email_msg)
-        return True, f"✅ Saruna nosūtīta uz {target_email}"
+            server.sendmail(gmail_user, recipients, email_msg.as_string())
+        saņēmēji_teksts = " un ".join(recipients)
+        return True, f"✅ Saruna nosūtīta uz {saņēmēji_teksts}"
     except Exception as e:
         return False, f"❌ Sūtīšanas kļūda: {e}"
 
@@ -1184,7 +1192,10 @@ def main():
         #     ...
         st.divider()
         if st.button("📧 Nosūtīt sarunu uz e-pastu"):
-            ok, msg = send_chat_by_email(st.session_state.messages)
+            ok, msg = send_chat_by_email(
+                st.session_state.messages,
+                st.session_state.get("authenticated_user", ""),
+            )
             if ok:
                 st.success(msg)
             else:
