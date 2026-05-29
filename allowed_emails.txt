@@ -3,3 +3,5 @@
 # Rindas, kas sākas ar #, tiek ignorētas
 
 raivis.biskaps@visma.com
+rbiskaps@gmail.com
+
