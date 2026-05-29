@@ -626,8 +626,8 @@ Izvelc šādus laukus (ja nav atrodams — atstāj ""):
     return mainīgie
 
 
-_TUKSS   = "_AIZPILDIT_"   # marķieris tukšiem laukiem → dzeltenā iezīmēšana
-_LPP     = "_LPP_"         # marķieris lpp → NUMPAGES lauka kods
+_TUKSS_PREFIKS = "_TUKSS_"  # + lauka nosaukums, piemēram "_TUKSS_uznemuma_nosaukums"
+_LPP           = "_LPP_"   # marķieris lpp → NUMPAGES lauka kods
 
 
 def _postprocess_ligums(doc_bytes: bytes) -> bytes:
@@ -670,9 +670,10 @@ def _postprocess_ligums(doc_bytes: bytes) -> bytes:
                 new_t.text = suffix
                 new_run.append(new_t)
                 run._r.addnext(new_run)
-        elif _TUKSS in run.text:
-            # Aizstāj ar atstarpēm + dzeltenā fona iezīmēšana
-            run.text = run.text.replace(_TUKSS, "               ")
+        elif _TUKSS_PREFIKS in run.text:
+            # Izvelk lauka nosaukumu no marķiera un iezīmē dzeltenā
+            # Piemēram "_TUKSS_uznemuma_nosaukums" → "uznemuma_nosaukums" (dzeltenā)
+            run.text = run.text.replace(_TUKSS_PREFIKS, "")
             run.font.highlight_color = WD_COLOR_INDEX.YELLOW
 
     for para in doc.paragraphs:
@@ -717,7 +718,7 @@ def generate_ligums_docx(messages: list, model_name: str,
         if k == "lpp":
             konteksts[k] = _LPP          # aizstāj ar NUMPAGES pēc renderēšanas
         elif not v:
-            konteksts[k] = _TUKSS        # aizstāj ar dzeltenā iezīmētu vietu
+            konteksts[k] = f"{_TUKSS_PREFIKS}{k}"  # "_TUKSS_uznemuma_nosaukums" u.tml.
         else:
             konteksts[k] = v
 
