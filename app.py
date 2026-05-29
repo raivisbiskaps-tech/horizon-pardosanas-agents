@@ -1078,7 +1078,7 @@ def main():
             st.markdown(question)
 
         with st.chat_message("assistant"):
-            with st.spinner("Meklē dokumentācijā..."):
+            with st.spinner("Prātoju ..."):
                 context, sources = retrieve_context(collection, question)
                 if not context:
                     answer  = "Šī informācija nav pieejama dokumentācijā."
