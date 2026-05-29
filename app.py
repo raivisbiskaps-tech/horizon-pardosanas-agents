@@ -900,6 +900,74 @@ def generate_tame_excel(messages: list, model_name: str) -> tuple[bytes, str]:
     return buf.getvalue(), sections
 
 
+# ── Autentifikācija ───────────────────────────────────────────────────────────
+
+def load_allowed_emails() -> set:
+    """Ielādē atļauto e-pastu sarakstu.
+
+    Avotu prioritāte:
+    1. Streamlit Secrets: ALLOWED_EMAILS = "a@b.com,c@d.com"
+    2. Fails allowed_emails.txt (viens e-pasts uz rindas, # — komentāri)
+    """
+    # 1. Streamlit Secrets
+    try:
+        raw = st.secrets.get("ALLOWED_EMAILS", "")
+        if raw:
+            return {e.strip().lower() for e in raw.split(",") if e.strip()}
+    except Exception:
+        pass
+
+    # 2. Fails
+    emails_file = os.path.join(BASE_DIR, "allowed_emails.txt")
+    if os.path.exists(emails_file):
+        emails = set()
+        with open(emails_file, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    emails.add(line.lower())
+        return emails
+
+    return set()
+
+
+def show_login():
+    """Rāda pieteikšanās lapu. Atgriež True, ja lietotājs autentificēts."""
+    st.set_page_config(
+        page_title="Pārdošanas aģents — pieteikšanās",
+        page_icon="🔐",
+        layout="centered",
+    )
+
+    # Centrētā karte
+    col_l, col_c, col_r = st.columns([1, 2, 1])
+    with col_c:
+        logo_path = os.path.join(BASE_DIR, "assets", "logo.jpg")
+        if os.path.exists(logo_path):
+            st.image(logo_path, width=160)
+
+        st.markdown("## 🔐 Pieteikšanās")
+        st.markdown("Ievadi savu e-pasta adresi, lai piekļūtu sistēmai.")
+
+        with st.form("login_form"):
+            epasts = st.text_input("E-pasts", placeholder="vards.uzvards@uznemums.lv")
+            submit = st.form_submit_button("Pieteikties", use_container_width=True)
+
+        if submit:
+            allowed = load_allowed_emails()
+            if not allowed:
+                st.error("⚠️ Nav konfigurēts atļauto lietotāju saraksts.")
+                return False
+            if epasts.strip().lower() in allowed:
+                st.session_state.authenticated      = True
+                st.session_state.authenticated_user = epasts.strip().lower()
+                st.rerun()
+            else:
+                st.error("❌ Šis e-pasts nav reģistrēts. Sazinieties ar sistēmas administratoru.")
+
+    return False
+
+
 # ── Streamlit UI ──────────────────────────────────────────────────────────────
 
 def main():
@@ -1128,8 +1196,16 @@ def main():
             st.cache_resource.clear()
             st.rerun()
         st.divider()
-        # st.caption(f"Modelis: {MODELS[st.session_state.selected_model]['model']}")
+        user = st.session_state.get("authenticated_user", "")
+        st.caption(f"👤 {user}")
+        if st.button("🚪 Izrakstīties"):
+            st.session_state.authenticated      = False
+            st.session_state.authenticated_user = ""
+            st.rerun()
 
 
 if __name__ == "__main__":
-    main()
+    if not st.session_state.get("authenticated"):
+        show_login()
+    else:
+        main()

@@ -1,0 +1,5 @@
+# Atļautie lietotāji — Horizon pārdošanas aģents
+# Pievieno vienu e-pastu uz katras rindas
+# Rindas, kas sākas ar #, tiek ignorētas
+
+raivis.biskaps@visma.com
