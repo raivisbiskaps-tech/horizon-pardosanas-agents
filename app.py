@@ -90,10 +90,15 @@ def parse_markers(text: str) -> tuple[str, list[str]]:
     Atgriež (tīrs teksts bez marķieriem, atrasto marķieru saraksts).
     """
     found = []
-    for marker, darbība in CHAT_MARKERS.items():
-        if marker in text:
-            text = text.replace(marker, "")
-            found.append(darbība)
+    # Izmanto regex — izturīgi pret dažādām rakstzīmju variācijām
+    tame_pat   = re.compile(r'\[ACTION[:\s_-]*TAME\]',   re.IGNORECASE)
+    ligums_pat = re.compile(r'\[ACTION[:\s_-]*LIGUMS?\]', re.IGNORECASE)
+    if tame_pat.search(text):
+        text = tame_pat.sub("", text)
+        found.append("tāme")
+    if ligums_pat.search(text):
+        text = ligums_pat.sub("", text)
+        found.append("līgums")
     return text.strip(), found
 
 
@@ -1170,7 +1175,7 @@ def main():
 
             st.markdown(answer)
             # DEBUG — izņem pēc pārbaudes
-            st.warning(f"🔍 DEBUG: `{answer_raw[-150:]}`")
+            st.warning(f"🔍 markers={markers} | beigas: `{repr(answer_raw[-80:])}`")
             tables = extract_markdown_tables(answer)
             if tables:
                 excel_bytes = tables_to_excel_bytes(tables)
