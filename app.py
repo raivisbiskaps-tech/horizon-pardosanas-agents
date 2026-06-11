@@ -75,7 +75,7 @@ Darbību marķieri — ieviešanas tāmes un piedāvājuma sagatavošanai:
 - Kad ir pietiekami daudz info līgumam → pievieno atbildes beigās tieši šo tekstu: [ACTION:LIGUMS]
 - Abus var pievienot vienlaikus, piemēram: [ACTION:TAME][ACTION:LIGUMS]
 - Marķieri ir tehniski tagi — klients tos neredz, tos apstrādā sistēma automātiski
-- SVARĪGI: marķierus raksti TIEŠI tā, bez tulkošanas vai maiņas"""
+- SVARĪGI: marķierus raksti TIEŠI tā, bez tulkošanas, maiņas vai Markdown formatēšanas (bez **)"""
 
 
 # ── Čata marķieri ────────────────────────────────────────────────────────────
@@ -90,9 +90,10 @@ def parse_markers(text: str) -> tuple[str, list[str]]:
     Atgriež (tīrs teksts bez marķieriem, atrasto marķieru saraksts).
     """
     found = []
-    # Izmanto regex — izturīgi pret dažādām rakstzīmju variācijām
-    tame_pat   = re.compile(r'\[ACTION[:\s_-]*TAME\]',   re.IGNORECASE)
-    ligums_pat = re.compile(r'\[ACTION[:\s_-]*LIGUMS?\]', re.IGNORECASE)
+    # Izmanto regex — izturīgi pret Markdown formatēšanu (**) un citām variācijām
+    # Piemēri: [ACTION:TAME], [**ACTION:TAME**], [ACTION TAME], utt.
+    tame_pat   = re.compile(r'\[\*{0,2}ACTION[:\s_-]*TAME\*{0,2}\]',   re.IGNORECASE)
+    ligums_pat = re.compile(r'\[\*{0,2}ACTION[:\s_-]*LIGUMS?\*{0,2}\]', re.IGNORECASE)
     if tame_pat.search(text):
         text = tame_pat.sub("", text)
         found.append("tāme")
