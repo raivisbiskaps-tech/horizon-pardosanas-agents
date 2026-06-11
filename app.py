@@ -38,49 +38,63 @@ MODELS = {
     "🔵 Gemini Pro":     {"provider": "gemini",  "model": "gemini-1.5-pro"},
 }
 
-SYSTEM_PROMPT = """Tu esi pieredzējis ERP Horizon pārdošanas atbalsta speciālists, kas sniedz detalizētas un noderīgas atbildes, balstoties uz sniegto informāciju. Strādā uzņēmuma VISMA, kas izplata, izstrāda un ievieš ERP Horizon. Tavs uzdevums ir sniegt atbildes uz potenciālo klientu jautājumiem.
+SYSTEM_PROMPT = """Tu esi pieredzējis ERP Horizon pārdošanas atbalsta speciālists. Strādā uzņēmumā VISMA, kas izplata, izstrādā un ievieš ERP Horizon.
 
 Noteikumi:
-- Sniedz pilnīgas, detalizētas atbildes — neaprobežojies ar vienu teikumu, bet arī neizplūsti garos apcerējumos
-- Izmanto konkrētus piemērus un soļus no dokumentācijas, ja tie ir pieejami
-- Ja atbilde nav atrodama dokumentācijā, atbildi: "Uz šo jautājumu nevarēšu sniegt precīzu atbildi, zvaniet Santai :)."
-- Nekad neizdomā informāciju, ko neatrodi dokumentos
+- Balsties tikai un vienīgi uz informāciju, kas pieejama pievienotajos dokumentos un klienta sarakstē sniegtajā informācijā
+- Pilnīgas, detalizētas atbildes — ne pārāk īsas, ne pārāk garas
+- Izmanto piemērus no dokumentācijas
+- Ja atbilde nav dokumentos → "Uz šo jautājumu nevarēšu sniegt precīzu atbildi, zvaniet Santai :)."
+- Nekad neizdomā informāciju
 - Ja jautājums ir neskaidrs, lūdz precizējumu
-- Atbildi tajā pašā valodā, kurā tiek uzdots jautājums
+- Atbild tajā pašā valodā
 
 Konteksts par klientu:
-- Jautājumus uzdod potenciāls klients bez Horizon zināšanām
-- Klients neorientējas Horizon struktūrā un terminoloģijā
-- Atbildes sniedz saprotamā, klientam draudzīgā valodā
-- Viņš izvēlas ERP sistēmu, tādēļ maksimāli jānotur viņa informācija
+- Potenciāls klients bez Horizon zināšanām
+- Izvēlas ERP sistēmu — jānotur viņa interese
 - Uzdod uzvedinošus jautājumus un piedāvā iegūt papildus informāciju
+- Bez jautājumiem, klients var sarakstē iekļaut informāciju, kas nepieciešama piedāvājuma un līguma sagatavošanai — uzņēmuma rekvizīti, kontaktinformācija, nepieciešamā sistēmas komplektācija
 
-Horizon terminoloģija:
-- "Bizness" un "Ražošana" šajā kontekstā nav vispārīgs vārds — tas ir vienas no Horizon papildiespēju pakām nosaukums
+Terminoloģija:
+- "Bizness" un "Ražošana" = Horizon papildiespēju paku nosaukumi (nevis vispārīgi vārdi)
 
 Stils:
-- Atbildi vieglā, sarunbiedra valodā
+- Viegla, sarunbiedra valoda
 - Var izmantot humoru un iepīt atbildēs pa kādam jokam
 
 Tabulas:
-- Ja jautājums ir par izmaksām, cenām, kur atbilde ir apjomīga strukturēta informācija — izmanto Markdown tabulas formātu
+- Izmantot Markdown tabulas, ja atbilde ir apjomīga strukturēta informācija (izmaksas, cenas u.tml.)
 - Tabulas galvenei izmanto treknrakstu (|Modulis|Cena| u.tml.)
 - Ciparus un cenas formatē konsekventi
 
-Ieviešanas tāme:
-- Ja klients jautā par ieviešanu vai ieviešanas izmaksām, rīkojies šādi:
-  1. Izvērtē sarakstes kontekstu — ko jau zinām par klienta vajadzībām (moduļi, nozare, lietotāju skaits utt.)
-  2. Uzdod tikai tos precizējošos jautājumus, uz kuriem atbilde vēl nav zināma no sarakstes:
-     - Vai nepieciešama Pamatsistēma (grāmatvedība, rēķini, noliktava)?
-     - Vai nepieciešams Algu un personāla modulis?
-     - Vai nepieciešams HOP Personāls (pieteikumi, komandējumi, izdevumi, rīkojumi)?
-     - Vai nepieciešama HOP Darba laika uzskaite?
-     - Vai nepieciešami HOP Rēķini (rēķinu saskaņošana)?
-     - Vai nepieciešama NUMO Darba laika plānošana?
-     - Cik lietotāji strādās sistēmā?
-  3. OBLIGĀTI — pirms tāmes sagatavošanas apkopo saprasto un pārjautā klientam:
-     "Lai sagatavotu tāmi, esmu sapratis, ka jums nepieciešams: [saraksts]. Vai esmu pareizi sapratis?"
-  4. Tikai pēc klienta apstiprinājuma informē, ka tāme tiek sagatavota"""
+Darbību marķieri — ieviešanas tāmes un piedāvājuma sagatavošanai:
+- Izvērtē sarakstes kontekstu — ko jau zinām
+- Uzdod tikai trūkstošos precizējošos jautājumus (moduļi, lietotāju skaits u.tml.)
+- Apkopo saprasto un pārjautā klientam
+- Pēc klienta apstiprinājuma par moduļiem → pievieno atbildes beigās tieši šo tekstu: [ACTION:TAME]
+- Kad ir pietiekami daudz info līgumam → pievieno atbildes beigās tieši šo tekstu: [ACTION:LIGUMS]
+- Abus var pievienot vienlaikus, piemēram: [ACTION:TAME][ACTION:LIGUMS]
+- Marķieri ir tehniski tagi — klients tos neredz, tos apstrādā sistēma automātiski
+- SVARĪGI: marķierus raksti TIEŠI tā, bez tulkošanas vai maiņas"""
+
+
+# ── Čata marķieri ────────────────────────────────────────────────────────────
+
+CHAT_MARKERS = {
+    "[ACTION:TAME]":   "tāme",
+    "[ACTION:LIGUMS]": "līgums",
+}
+
+def parse_markers(text: str) -> tuple[str, list[str]]:
+    """Izvelk darbību marķierus no AI atbildes.
+    Atgriež (tīrs teksts bez marķieriem, atrasto marķieru saraksts).
+    """
+    found = []
+    for marker, darbība in CHAT_MARKERS.items():
+        if marker in text:
+            text = text.replace(marker, "")
+            found.append(darbība)
+    return text.strip(), found
 
 
 # ── Indeksēšana ───────────────────────────────────────────────────────────────
@@ -1051,6 +1065,70 @@ def main():
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
+    def render_marker_buttons(markers: list, key_prefix: str):
+        """Renderē darbību pogas atbilstoši AI atbildes marķieriem."""
+        if not markers:
+            return
+        cols = st.columns(len(markers))
+        for i, darbība in enumerate(markers):
+            with cols[i]:
+                if darbība == "tāme" and st.button(
+                    "📊 Sagatavot ieviešanas tāmi", key=f"{key_prefix}_tāme",
+                    use_container_width=True,
+                ):
+                    with st.spinner("Sagatavo tāmi..."):
+                        excel_bytes, result = generate_tame_excel(
+                            st.session_state.messages,
+                            st.session_state.selected_model,
+                        )
+                    if excel_bytes:
+                        sadaļas = ", ".join(result) if isinstance(result, list) else ""
+                        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        st.session_state.tame_bytes    = excel_bytes
+                        st.session_state.tame_filename = f"horizon_tame_{ts}.xlsx"
+                        st.session_state.tame_sadaļas  = sadaļas
+                        ok, info = send_file_by_email(
+                            excel_bytes, st.session_state.tame_filename,
+                            subject=f"Horizon ieviešanas tāme — {datetime.now().strftime('%d.%m.%Y')}",
+                            body=f"Pielikumā ieviešanas tāme.\nIekļautās sadaļas: {sadaļas}",
+                            user_email=st.session_state.get("authenticated_user", ""),
+                        )
+                        if ok:
+                            st.success(f"✅ Tāme sagatavota un nosūtīta uz: {info}")
+                        else:
+                            st.success(f"✅ Tāme sagatavota. Sadaļas: {sadaļas}")
+                    else:
+                        st.error(result)
+
+                if darbība == "līgums" and st.button(
+                    "📝 Sagatavot līgumu", key=f"{key_prefix}_līgums",
+                    use_container_width=True,
+                ):
+                    with st.spinner("Sagatavo līgumu..."):
+                        doc_bytes, rezultats = generate_ligums_docx(
+                            st.session_state.messages,
+                            st.session_state.selected_model,
+                            st.session_state.get("klienta_rekviziti"),
+                        )
+                    if doc_bytes:
+                        klienta_nos = rezultats.get("uznemuma_nosaukums", "") if isinstance(rezultats, dict) else ""
+                        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        st.session_state.ligums_bytes    = doc_bytes
+                        st.session_state.ligums_mainīgie = rezultats
+                        st.session_state.ligums_filename = f"horizon_ligums_{klienta_nos or ts}.docx"
+                        ok, info = send_file_by_email(
+                            doc_bytes, st.session_state.ligums_filename,
+                            subject=f"Horizon līgums — {klienta_nos or datetime.now().strftime('%d.%m.%Y')}",
+                            body=f"Pielikumā sagatavotais līgums{f' — {klienta_nos}' if klienta_nos else ''}.",
+                            user_email=st.session_state.get("authenticated_user", ""),
+                        )
+                        if ok:
+                            st.success(f"✅ Līgums sagatavots un nosūtīts uz: {info}")
+                        else:
+                            st.success("✅ Līgums sagatavots.")
+                    else:
+                        st.error(rezultats)
+
     for idx, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
@@ -1066,6 +1144,7 @@ def main():
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key=f"dl_{idx}",
                     )
+                render_marker_buttons(msg.get("markers", []), key_prefix=f"msg_{idx}")
             if msg.get("sources"):
                 with st.expander("📎 Avoti"):
                     for src in msg["sources"]:
@@ -1081,13 +1160,17 @@ def main():
             with st.spinner("Prātoju ..."):
                 context, sources = retrieve_context(collection, question)
                 if not context:
-                    answer  = "Šī informācija nav pieejama dokumentācijā."
-                    sources = []
+                    answer_raw = "Šī informācija nav pieejama dokumentācijā."
+                    sources    = []
                 else:
-                    answer = ask_ai(question, context, st.session_state.selected_model, st.session_state.messages)
+                    answer_raw = ask_ai(question, context, st.session_state.selected_model, st.session_state.messages)
+
+            # Izvelk marķierus no atbildes
+            answer, markers = parse_markers(answer_raw)
 
             st.markdown(answer)
-            # Ja atbildē ir tabula — piedāvā Excel lejupielādi
+            # DEBUG — izņem pēc pārbaudes
+            st.warning(f"🔍 DEBUG: `{answer_raw[-150:]}`")
             tables = extract_markdown_tables(answer)
             if tables:
                 excel_bytes = tables_to_excel_bytes(tables)
@@ -1098,15 +1181,17 @@ def main():
                     file_name=f"horizon_aprekins_{timestamp}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
+            render_marker_buttons(markers, key_prefix="new_msg")
             if sources:
                 with st.expander("📎 Avoti"):
                     for src in sources:
                         st.text(f"• {src}")
 
         st.session_state.messages.append({
-            "role": "assistant",
-            "content": answer,
-            "sources": sources,
+            "role":      "assistant",
+            "content":   answer,
+            "markers":   markers,
+            "sources":   sources,
             "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
         })
 
