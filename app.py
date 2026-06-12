@@ -938,24 +938,36 @@ def generate_tame_excel(messages: list, model_name: str) -> tuple[bytes, str]:
     LINE_HEIGHT = 15  # Excel punkti uz teksta rindu
     MIN_HEIGHT  = 32
 
+    HEADER_ROW = 1   # galvenes rinda šablonā (pirms insert_rows)
+    HEADER_HEIGHT = 22
+
     for row in ws.iter_rows():
+        row_idx = row[0].row
+        if row_idx == HEADER_ROW:
+            # Galvenes rindai — fiksēts mazāks augstums
+            for cell in row:
+                if cell.value:
+                    cell.alignment = Alignment(wrap_text=True, vertical="center",
+                                               horizontal="center")
+            ws.row_dimensions[row_idx].height = HEADER_HEIGHT
+            continue
+
         max_lines = 1
         for cell in row:
             if cell.value and isinstance(cell.value, str):
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
                 eff_chars = EFFECTIVE_CHARS.get(cell.column, 18)
-                # Sadala pēc \n, tad aprēķina wrapping katrai rindai
                 text_lines = cell.value.split("\n")
                 lines = 0
                 for line in text_lines:
                     line = line.strip()
                     if line:
-                        lines += max(1, -(-len(line) // eff_chars))  # ceiling division
+                        lines += max(1, -(-len(line) // eff_chars))
                     else:
-                        lines += 1  # tukša rinda
+                        lines += 1
                 max_lines = max(max_lines, lines)
         row_height = max(MIN_HEIGHT, max_lines * LINE_HEIGHT)
-        ws.row_dimensions[row[0].row].height = row_height
+        ws.row_dimensions[row_idx].height = row_height
 
     # Iestata kolonnu platumu
     for col_idx, width in COL_WIDTHS.items():
