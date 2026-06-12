@@ -1024,8 +1024,8 @@ def _ir_dokumentu_jautajums(teksts: str, history: list) -> bool:
     vardi = t.split()
     pirmais = vardi[0] if vardi else ""
 
-    # 1. Ļoti īss ziņojums (≤ 25 zīmes) — skaidra atbilde ("Jā", "Labi", "10 lietotāji")
-    if len(t) <= 25:
+    # 1. Ļoti īss ziņojums (≤ 15 zīmes) — skaidra atbilde ("Jā", "Labi", "10 lietotāji")
+    if len(t) <= 15:
         return False
 
     # 2. Sākas ar skaidru apstiprinājumu/noliegumu (tikai pirmais vārds)
