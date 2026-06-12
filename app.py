@@ -60,6 +60,7 @@ Sarakstes konteksta interpretācija:
 - Ja klients sniedz īsu atbildi ("Jā", "Tieši tā", "Vajag arī personālu", "Nē, tas nav nepieciešams") — interpretē to kā atbildi uz pēdējo uzdoto jautājumu
 - Ja klients apstiprina vai noliedz kādu no piedāvātajiem moduļiem — piefiksē to un apkopo kopējo saprasto ainu
 - Ja nav skaidrs uz kuru jautājumu klients atbild — pārjautā konkrēti
+- Ja klients sarakstē sniedz informāciju (rekvizīti, kontaktpersona, moduļu izvēle, lietotāju skaits u.c.) — uztver to kā faktu, apstiprina saņemšanu un turpini sarakstes loģiku; NEMĒĢINI sniegt atbildi uz to kā uz jautājumu
 
 Terminoloģija:
 - "Bizness" un "Ražošana" = Horizon papildiespēju paku nosaukumi (nevis vispārīgi vārdi)
