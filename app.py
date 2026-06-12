@@ -986,7 +986,7 @@ def generate_tame_excel(messages: list, model_name: str) -> tuple[bytes, str]:
     ws["A2"].alignment = Alignment(wrap_text=False)
     ws.row_dimensions[2].height = 20
     # Galvenes rinda pēc ievietošanas ir rinda 3 — fiksēts augstums
-    ws.row_dimensions[3].height = 20
+    ws.row_dimensions[3].height = 100
 
     # Saglabā atmiņā
     buf = io.BytesIO()
