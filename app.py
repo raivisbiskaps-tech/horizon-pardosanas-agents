@@ -201,13 +201,19 @@ def retrieve_context(collection, question: str) -> tuple[str, list[str]]:
     return "\n\n---\n\n".join(context_parts), sources
 
 
-def ask_ai(question: str, context: str, model_name: str, history: list = None) -> str:
-    """Nosūta jautājumu uz izvēlēto AI modeli, iekļaujot sarakstes vēsturi."""
+def ask_ai(question: str, context: str, model_name: str,
+           history: list = None, izmanto_rag: bool = True) -> str:
+    """Nosūta jautājumu uz izvēlēto AI modeli, iekļaujot sarakstes vēsturi.
+
+    izmanto_rag=True  → ziņojums ietver dokumentu fragmentus un to ierobežojumu
+    izmanto_rag=False → ziņojums ir tikai sarakstes turpinājums bez RAG ierobežojuma
+    """
     model_cfg = MODELS[model_name]
     provider  = model_cfg["provider"]
     model_id  = model_cfg["model"]
 
-    user_message = f"""Zemāk ir VIENĪGIE dokumentu fragmenti, ko drīksti izmantot atbildē.
+    if izmanto_rag and context:
+        user_message = f"""Zemāk ir VIENĪGIE dokumentu fragmenti, ko drīksti izmantot atbildē.
 Ja atbilde nav šajos fragmentos — nekādā gadījumā to neizdomā.
 
 === DOKUMENTU FRAGMENTI ===
@@ -215,6 +221,9 @@ Ja atbilde nav šajos fragmentos — nekādā gadījumā to neizdomā.
 === BEIGAS ===
 
 Jautājums: {question}"""
+    else:
+        # Atbilde/komanda/informācija — turpina sarakstes loģiku bez dokumentu ierobežojuma
+        user_message = question
 
     # Veido ziņojumu sarakstu ar sarakstes vēsturi
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -1235,7 +1244,12 @@ def main():
                 if not context and ir_jautajums:
                     answer_raw = "Šī informācija nav pieejama dokumentācijā."
                 else:
-                    answer_raw = ask_ai(question, context, st.session_state.selected_model, st.session_state.messages)
+                    answer_raw = ask_ai(
+                        question, context,
+                        st.session_state.selected_model,
+                        st.session_state.messages,
+                        izmanto_rag=ir_jautajums,
+                    )
 
             # Izvelk marķierus no atbildes
             answer, markers = parse_markers(answer_raw)
