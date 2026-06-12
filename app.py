@@ -80,6 +80,7 @@ Darbību marķieri — ieviešanas tāmes un piedāvājuma sagatavošanai:
 - Apkopo saprasto un pārjautā klientam
 - Pēc klienta apstiprinājuma par moduļiem → pievieno atbildes beigās tieši šo tekstu: [ACTION:TAME]
 - Kad ir pietiekami daudz info līgumam → pievieno atbildes beigās tieši šo tekstu: [ACTION:LIGUMS]
+- OBLIGĀTI pirms [ACTION:LIGUMS]: pārliecinies, ka sarakstē ir zināms uzņēmuma nosaukums VAI reģistrācijas numurs. Ja nav — vispirms papraси: "Lai sagatavotu līgumu, lūdzu norādiet uzņēmuma nosaukumu un reģistrācijas numuru."
 - Abus var pievienot vienlaikus, piemēram: [ACTION:TAME][ACTION:LIGUMS]
 - Marķieri ir tehniski tagi — klients tos neredz, tos apstrādā sistēma automātiski
 - SVARĪGI: marķierus raksti TIEŠI tā, bez tulkošanas, maiņas vai Markdown formatēšanas (bez **)"""
