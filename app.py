@@ -1007,45 +1007,30 @@ def generate_tame_excel(messages: list, model_name: str) -> tuple[bytes, str]:
 # ── Ziņojuma tipa klasifikators ───────────────────────────────────────────────
 
 def _ir_dokumentu_jautajums(teksts: str, history: list) -> bool:
-    """Nosaka vai ziņojums ir īsts dokumentācijas jautājums (True)
-    vai atbilde/informācija/komanda (False — RAG nav nepieciešams).
+    """Nosaka vai ziņojums ir dokumentācijas jautājums (True → izmanto RAG)
+    vai skaidra atbilde/komanda (False → RAG izlaists).
+    Konservatīvs — šaubīgos gadījumos atgriež True (izmanto RAG).
     """
     t = teksts.strip().lower()
+    vardi = t.split()
+    pirmais = vardi[0] if vardi else ""
 
-    # Ļoti īss ziņojums — gandrīz noteikti atbilde, nevis jautājums
-    if len(t) < 60:
+    # 1. Ļoti īss ziņojums (≤ 25 zīmes) — skaidra atbilde ("Jā", "Labi", "10 lietotāji")
+    if len(t) <= 25:
         return False
 
-    # Komandas — tāme, līgums, piedāvājums
-    komandas = ["sagatavo", "gatavo", "izveidо", "nosūti", "sūti",
-                "sagatavot", "gatavot", "izveidot", "nosūtīt"]
-    if any(t.startswith(k) or f" {k}" in t for k in komandas):
+    # 2. Sākas ar skaidru apstiprinājumu/noliegumu (tikai pirmais vārds)
+    skaidras_atbildes = {"jā", "nē", "jap", "labi", "ok", "pareizi",
+                         "tieši", "protams", "sapratu", "skaidrs", "paldies"}
+    if pirmais in skaidras_atbildes:
         return False
 
-    # Atbildes uz jautājumiem — sākas ar apstiprinājumu vai noliegumu
-    atbildes = ["jā", "nē", "jap", "njā", "labi", "ok", "tieši",
-                "pareizi", "vajag", "nevajag", "arī", "plus", "bez",
-                "paldies", "sapratu", "skaidrs", "protams"]
-    pirmais_vards = t.split()[0] if t.split() else ""
-    if pirmais_vards in atbildes:
+    # 3. Tīra komanda bez jautājuma zīmes
+    komandas = ["sagatavo ", "nosūti ", "gatavo ", "sūti "]
+    if any(t.startswith(k) for k in komandas) and "?" not in teksts:
         return False
 
-    # Informācijas sniegšana — satur rekvizītu atslēgvārdus
-    rekviziti = ["reģ", "reg", "pvn", "nosaukums", "adrese",
-                 "kontakt", "tālrunis", "e-pasts", "lietotāj"]
-    if any(r in t for r in rekviziti) and "?" not in teksts:
-        return False
-
-    # Ja sarakstē jau bijuši mūsu precizējoši jautājumi — atbilde visticamāk turpina sarunu
-    if history and len(history) >= 2:
-        last_assistant = next(
-            (m["content"] for m in reversed(history[:-1]) if m["role"] == "assistant"),
-            ""
-        )
-        # Ja pēdējā aģenta atbilde beidzas ar jautājumzīmi — klients atbild
-        if last_assistant.rstrip().endswith("?") and "?" not in teksts:
-            return False
-
+    # Visos pārējos gadījumos — izmanto RAG
     return True
 
 
