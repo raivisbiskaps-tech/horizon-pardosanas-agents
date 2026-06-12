@@ -55,12 +55,21 @@ Konteksts par klientu:
 - Uzdod uzvedinošus jautājumus un piedāvā iegūt papildus informāciju
 - Bez jautājumiem, klients var sarakstē iekļaut informāciju, kas nepieciešama piedāvājuma un līguma sagatavošanai — uzņēmuma rekvizīti, kontaktinformācija, nepieciešamā sistēmas komplektācija
 
-Sarakstes konteksta interpretācija:
-- Vienmēr lasi klienta jaunāko ziņojumu KOPĀ ar visu iepriekšējo sarakstes vēsturi
-- Ja klients sniedz īsu atbildi ("Jā", "Tieši tā", "Vajag arī personālu", "Nē, tas nav nepieciešams") — interpretē to kā atbildi uz pēdējo uzdoto jautājumu
-- Ja klients apstiprina vai noliedz kādu no piedāvātajiem moduļiem — piefiksē to un apkopo kopējo saprasto ainu
-- Ja nav skaidrs uz kuru jautājumu klients atbild — pārjautā konkrēti
-- Ja klients sarakstē sniedz informāciju (rekvizīti, kontaktpersona, moduļu izvēle, lietotāju skaits u.c.) — uztver to kā faktu, apstiprina saņemšanu un turpini sarakstes loģiku; NEMĒĢINI sniegt atbildi uz to kā uz jautājumu
+Ziņojumu veidi — OBLIGĀTI ievēro:
+
+1. JAUTĀJUMS par Horizon (piemēram: "Kādi moduļi ir pieejami?", "Cik maksā?")
+   → Atbildi no dokumentācijas
+
+2. ATBILDE uz mūsu jautājumu (piemēram: "Jā", "Nē", "Vajag arī personālu", "10 lietotāji", "Tieši tā")
+   → Interpretē kā atbildi uz pēdējo uzdoto jautājumu. NEKAD nesaki "nevaru sniegt atbildi". Apkopo saprasto un turpini.
+
+3. INFORMĀCIJAS sniegšana (piemēram: uzņēmuma nosaukums, reģ. nr., kontaktpersona, adrese)
+   → Uztver kā faktu. Apstiprina saņemšanu ("Paldies, piefiksēju!"). NEKAD nemēģini meklēt šo dokumentācijā.
+
+4. UZDEVUMS vai KOMANDA (piemēram: "Sagatavo līgumu", "Gatavo tāmi", "Nosūti piedāvājumu")
+   → Izpildi vai apstiprina nodomu. NEKAD nesaki "nevaru sniegt atbildi no dokumentācijas".
+
+Ja nav skaidrs uz kuru jautājumu klients atbild — pārjautā konkrēti, nevis norādi uz dokumentācijas trūkumu.
 
 Terminoloģija:
 - "Bizness" un "Ražošana" = Horizon papildiespēju paku nosaukumi (nevis vispārīgi vārdi)
@@ -995,6 +1004,51 @@ def generate_tame_excel(messages: list, model_name: str) -> tuple[bytes, str]:
     return buf.getvalue(), sections
 
 
+# ── Ziņojuma tipa klasifikators ───────────────────────────────────────────────
+
+def _ir_dokumentu_jautajums(teksts: str, history: list) -> bool:
+    """Nosaka vai ziņojums ir īsts dokumentācijas jautājums (True)
+    vai atbilde/informācija/komanda (False — RAG nav nepieciešams).
+    """
+    t = teksts.strip().lower()
+
+    # Ļoti īss ziņojums — gandrīz noteikti atbilde, nevis jautājums
+    if len(t) < 60:
+        return False
+
+    # Komandas — tāme, līgums, piedāvājums
+    komandas = ["sagatavo", "gatavo", "izveidо", "nosūti", "sūti",
+                "sagatavot", "gatavot", "izveidot", "nosūtīt"]
+    if any(t.startswith(k) or f" {k}" in t for k in komandas):
+        return False
+
+    # Atbildes uz jautājumiem — sākas ar apstiprinājumu vai noliegumu
+    atbildes = ["jā", "nē", "jap", "njā", "labi", "ok", "tieši",
+                "pareizi", "vajag", "nevajag", "arī", "plus", "bez",
+                "paldies", "sapratu", "skaidrs", "protams"]
+    pirmais_vards = t.split()[0] if t.split() else ""
+    if pirmais_vards in atbildes:
+        return False
+
+    # Informācijas sniegšana — satur rekvizītu atslēgvārdus
+    rekviziti = ["reģ", "reg", "pvn", "nosaukums", "adrese",
+                 "kontakt", "tālrunis", "e-pasts", "lietotāj"]
+    if any(r in t for r in rekviziti) and "?" not in teksts:
+        return False
+
+    # Ja sarakstē jau bijuši mūsu precizējoši jautājumi — atbilde visticamāk turpina sarunu
+    if history and len(history) >= 2:
+        last_assistant = next(
+            (m["content"] for m in reversed(history[:-1]) if m["role"] == "assistant"),
+            ""
+        )
+        # Ja pēdējā aģenta atbilde beidzas ar jautājumzīmi — klients atbild
+        if last_assistant.rstrip().endswith("?") and "?" not in teksts:
+            return False
+
+    return True
+
+
 # ── Autentifikācija ───────────────────────────────────────────────────────────
 
 def load_allowed_emails() -> set:
@@ -1186,10 +1240,15 @@ def main():
 
         with st.chat_message("assistant"):
             with st.spinner("Prātoju ..."):
-                context, sources = retrieve_context(collection, question)
-                if not context:
+                # Ja ziņojums ir īss vai izskatās pēc atbildes/komandas — RAG izlaiž
+                ir_jautajums = _ir_dokumentu_jautajums(question, st.session_state.messages)
+                if ir_jautajums:
+                    context, sources = retrieve_context(collection, question)
+                else:
+                    context, sources = "", []
+
+                if not context and ir_jautajums:
                     answer_raw = "Šī informācija nav pieejama dokumentācijā."
-                    sources    = []
                 else:
                     answer_raw = ask_ai(question, context, st.session_state.selected_model, st.session_state.messages)
 
