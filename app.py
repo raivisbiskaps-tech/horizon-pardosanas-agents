@@ -1175,8 +1175,6 @@ def main():
             answer, markers = parse_markers(answer_raw)
 
             st.markdown(answer)
-            # DEBUG — izņem pēc pārbaudes
-            st.warning(f"🔍 markers={markers} | beigas: `{repr(answer_raw[-80:])}`")
             tables = extract_markdown_tables(answer)
             if tables:
                 excel_bytes = tables_to_excel_bytes(tables)
