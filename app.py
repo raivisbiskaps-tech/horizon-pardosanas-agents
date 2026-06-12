@@ -54,6 +54,7 @@ Konteksts par klientu:
 - Izvēlas ERP sistēmu — jānotur viņa interese
 - Uzdod uzvedinošus jautājumus un piedāvā iegūt papildus informāciju
 - Bez jautājumiem, klients var sarakstē iekļaut informāciju, kas nepieciešama piedāvājuma un līguma sagatavošanai — uzņēmuma rekvizīti, kontaktinformācija, nepieciešamā sistēmas komplektācija
+- Ja kontekstā ir "[Automātiski iegūti rekvizīti no firmas.lv]" — nolasi tos un apstipriniet pie klienta: "Atradu šādus datus par jūsu uzņēmumu: [nosaukums, adrese, reģ. nr.]. Vai viss ir pareizi?"
 
 Ziņojumu veidi — OBLIGĀTI ievēro:
 
@@ -1047,6 +1048,46 @@ def _ir_dokumentu_jautajums(teksts: str, history: list) -> bool:
     return True
 
 
+# ── Automātiska rekvizītu iegūšana ───────────────────────────────────────────
+
+def _detect_uznemums(teksts: str) -> str | None:
+    """Mēģina atpazīt reģistrācijas numuru vai uzņēmuma nosaukumu tekstā.
+    Atgriež meklēšanas virkni firmas.lv vai None.
+    """
+    # Reģistrācijas numurs — 11 cipari
+    reg_match = re.search(r'\b\d{11}\b', teksts)
+    if reg_match:
+        return reg_match.group(0)
+
+    # Uzņēmuma forma + nosaukums (SIA "X", AS X, IK X u.tml.)
+    uzn_match = re.search(
+        r'\b(SIA|AS|IK|ZS|BO|VSIA|VAS|PSIA|kooperatīvs?)\s+["\']?[\wĀāČčĒēĢģĪīĶķĻļŅņŠšŪūŽž][\wĀāČčĒēĢģĪīĶķĻļŅņŠšŪūŽž\s"\']{2,40}',
+        teksts, re.IGNORECASE
+    )
+    if uzn_match:
+        return uzn_match.group(0).strip().strip('"\'')
+
+    return None
+
+
+def _rekvizitu_konteksts(rek: dict) -> str:
+    """Formatē iegūtos rekvizītus kā konteksta tekstu AI ziņojumam."""
+    rindas = ["[Automātiski iegūti rekvizīti no firmas.lv — apstipriniet pie klienta]"]
+    lauki = [
+        ("Nosaukums",        rek.get("nosaukums", "")),
+        ("Reģ. nr.",         rek.get("reg_numurs", "")),
+        ("PVN nr.",          rek.get("pvn_numurs", "")),
+        ("Juridiskā adrese", rek.get("juridiska_adrese", "")),
+        ("Tālrunis",         rek.get("talrunis", "")),
+        ("E-pasts",          rek.get("epasts", "")),
+        ("Mājas lapa",       rek.get("majas_lapa", "")),
+    ]
+    for label, val in lauki:
+        if val:
+            rindas.append(f"  {label}: {val}")
+    return "\n".join(rindas)
+
+
 # ── Autentifikācija ───────────────────────────────────────────────────────────
 
 def load_allowed_emails() -> set:
@@ -1238,21 +1279,41 @@ def main():
 
         with st.chat_message("assistant"):
             with st.spinner("Prātoju ..."):
-                # Ja ziņojums ir īss vai izskatās pēc atbildes/komandas — RAG izlaiž
+
+                # Automātiska rekvizītu iegūšana — ja nav jau iegūti
+                if not st.session_state.get("klienta_rekviziti"):
+                    vaicajums = _detect_uznemums(question)
+                    if vaicajums:
+                        rek = fetch_firmas_lv(vaicajums)
+                        if "kļūda" not in rek:
+                            st.session_state.klienta_rekviziti = rek
+
+                # Ja rekvizīti tikko iegūti — pievieno kontekstu AI ziņojumam
+                rek_konteksts = ""
+                if st.session_state.get("klienta_rekviziti"):
+                    rek = st.session_state.klienta_rekviziti
+                    # Pievieno tikai ja klients šajā ziņojumā pieminēja uzņēmumu
+                    if _detect_uznemums(question):
+                        rek_konteksts = "\n\n" + _rekvizitu_konteksts(rek)
+
+                # RAG meklēšana
                 ir_jautajums = _ir_dokumentu_jautajums(question, st.session_state.messages)
                 if ir_jautajums:
                     context, sources = retrieve_context(collection, question)
                 else:
                     context, sources = "", []
 
-                if not context and ir_jautajums:
+                # Apvieno RAG kontekstu ar rekvizītu kontekstu
+                pilns_konteksts = (context or "") + rek_konteksts
+
+                if not pilns_konteksts and ir_jautajums:
                     answer_raw = "Šī informācija nav pieejama dokumentācijā."
                 else:
                     answer_raw = ask_ai(
-                        question, context,
+                        question, pilns_konteksts,
                         st.session_state.selected_model,
                         st.session_state.messages,
-                        izmanto_rag=ir_jautajums,
+                        izmanto_rag=ir_jautajums or bool(rek_konteksts),
                     )
 
             # Izvelk marķierus no atbildes
