@@ -1204,7 +1204,9 @@ def main():
                     file_name=f"horizon_aprekins_{timestamp}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
-            render_marker_buttons(markers, key_prefix="new_msg")
+            # Key prefix atbilst nākamajam indeksam vēstures ciklā
+            new_msg_idx = len(st.session_state.messages)
+            render_marker_buttons(markers, key_prefix=f"msg_{new_msg_idx}")
             if sources:
                 with st.expander("📎 Avoti"):
                     for src in sources:
