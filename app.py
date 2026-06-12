@@ -1024,6 +1024,10 @@ def _ir_dokumentu_jautajums(teksts: str, history: list) -> bool:
     vardi = t.split()
     pirmais = vardi[0] if vardi else ""
 
+    # 0. Ja beidzas ar jautājuma zīmi — vienmēr izmanto RAG
+    if teksts.rstrip().endswith("?"):
+        return True
+
     # 1. Ļoti īss ziņojums (≤ 15 zīmes) — skaidra atbilde ("Jā", "Labi", "10 lietotāji")
     if len(t) <= 15:
         return False
