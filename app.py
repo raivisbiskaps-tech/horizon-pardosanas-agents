@@ -1310,40 +1310,53 @@ def main():
                         st.text(f"• {src}")
 
     # ── Čata ievade ───────────────────────────────────────────────────────────────
-    # JS novieto mic_button iframe tieši pa kreisi no st.chat_input sūtīšanas pogas.
+    # Fiziski pārvieto mic iframe uz document.body — tā tas nevar tikt apslēpts
+    # ar Streamlit konteinera overflow:hidden vai transform.
     st.markdown("""<script>
 (function () {
-    function fix() {
+    var SZ = 36;
+
+    /* Fiksēts konteiners pie body — izveido vienu reizi */
+    var bar = document.getElementById('_mic_bar');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = '_mic_bar';
+        bar.style.cssText = 'position:fixed;z-index:10001;width:' + SZ + 'px;height:' + SZ + 'px;display:none;';
+        document.body.appendChild(bar);
+    }
+
+    function position() {
+        var sendBtn = document.querySelector('[data-testid="stBottom"] button');
+        if (!sendBtn) return;
+        var r = sendBtn.getBoundingClientRect();
+        bar.style.bottom = Math.round(window.innerHeight - r.top - r.height / 2 - SZ / 2) + 'px';
+        bar.style.right  = Math.round(window.innerWidth  - r.left + 6) + 'px';
+        bar.style.display = 'block';
+    }
+
+    function moveIframe() {
         var mic = document.querySelector('iframe[title="mic_button"]');
-        if (!mic) return;
-        // Sakļauj vietu normālajā plūsmā
+        if (!mic || bar.contains(mic)) { position(); return; }
+
+        /* Sakļauj oriģinālo vietu plūsmā */
         var wrap = mic.parentElement;
         while (wrap && wrap !== document.body) {
             if (wrap.getAttribute('data-testid') === 'stElementContainer') {
-                wrap.style.cssText = 'height:0!important;overflow:hidden!important;padding:0!important;margin:0!important;';
+                wrap.style.cssText = 'height:0!important;min-height:0!important;overflow:hidden!important;padding:0!important;margin:0!important;';
                 break;
             }
             wrap = wrap.parentElement;
         }
-        // Novieto blakus sūtīšanas pogai
-        var sendBtn = document.querySelector('[data-testid="stBottom"] button');
-        if (!sendBtn) return;
-        var r = sendBtn.getBoundingClientRect();
-        var sz = 36;
-        Object.assign(mic.style, {
-            position:   'fixed',
-            bottom:     Math.round(window.innerHeight - r.top - r.height / 2 - sz / 2) + 'px',
-            right:      Math.round(window.innerWidth  - r.left + 6) + 'px',
-            width:      sz + 'px',
-            height:     sz + 'px',
-            border:     'none',
-            zIndex:     '10001',
-            background: 'transparent',
-        });
+
+        /* Pārvieto iframe uz fiksēto konteineru */
+        mic.style.cssText = 'width:' + SZ + 'px!important;height:' + SZ + 'px!important;border:none!important;display:block!important;background:transparent!important;';
+        bar.appendChild(mic);
+        position();
     }
-    fix();
-    new MutationObserver(fix).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('resize', fix);
+
+    moveIframe();
+    new MutationObserver(moveIframe).observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('resize', position);
 })();
 </script>""", unsafe_allow_html=True)
 
