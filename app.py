@@ -529,8 +529,51 @@ def send_chat_by_email(messages: list, user_email: str = "") -> tuple[bool, str]
 
 # ── Uzņēmumu reģistrs caur data.gov.lv API ───────────────────────────────────
 
-_UR_RESOURCE_ID = "25e80bf3-f107-4ab4-89ef-251b5b9374e9"
-_UR_API_URL     = "https://data.gov.lv/api/3/action/datastore_search"
+_UR_RESOURCE_ID  = "25e80bf3-f107-4ab4-89ef-251b5b9374e9"
+_VID_RESOURCE_ID = "610910e9-e086-4c5b-a7ea-0a896a697672"
+_DGL_API_URL     = "https://data.gov.lv/api/3/action/datastore_search"
+
+
+def fetch_pvn_status(regcode_str: str) -> dict:
+    """Pārbauda PVN maksātāja statusu VID datubāzē pēc reģistrācijas numura.
+
+    Atgriež:
+      pvn_numurs   – "LVxxxxxxxxxx" vai ""
+      pvn_aktīvs   – True/False
+      pvn_reģ      – reģistrācijas datums kā PVN maksātājs
+      pvn_izsl     – izslēgšanas datums (ja bijis un izslēgts)
+    """
+    import requests as req
+    import json as _json
+
+    pvn_num = f"LV{regcode_str}"
+    try:
+        r = req.get(
+            _DGL_API_URL,
+            params={
+                "resource_id": _VID_RESOURCE_ID,
+                "filters":     _json.dumps({"Numurs": pvn_num}),
+                "limit":       1,
+            },
+            timeout=8,
+        )
+        r.raise_for_status()
+        records = r.json().get("result", {}).get("records", [])
+    except Exception:
+        return {"pvn_numurs": "", "pvn_aktīvs": None, "pvn_reģ": "", "pvn_izsl": ""}
+
+    if not records:
+        return {"pvn_numurs": "", "pvn_aktīvs": False, "pvn_reģ": "", "pvn_izsl": ""}
+
+    rec = records[0]
+    aktīvs = rec.get("Aktivs", "").strip().lower() == "ir"
+    return {
+        "pvn_numurs": pvn_num if aktīvs or rec.get("Izslegts", "").strip() else "",
+        "pvn_aktīvs": aktīvs,
+        "pvn_reģ":    rec.get("Registrets", "").strip(),
+        "pvn_izsl":   rec.get("Izslegts", "").strip(),
+    }
+
 
 def fetch_data_gov_lv(vaicajums: str) -> dict:
     """Iegūst uzņēmuma rekvizītus no LR Uzņēmumu reģistra caur data.gov.lv API.
@@ -582,6 +625,9 @@ def fetch_data_gov_lv(vaicajums: str) -> dict:
 
     regcode_str = str(int(rec["regcode"])) if rec.get("regcode") else ""
 
+    # PVN statuss no VID
+    pvn = fetch_pvn_status(regcode_str) if regcode_str else {}
+
     return {
         "nosaukums":        rec.get("name", ""),
         "reg_numurs":       regcode_str,
@@ -589,7 +635,10 @@ def fetch_data_gov_lv(vaicajums: str) -> dict:
         "tips":             rec.get("type_text", ""),
         "registrēts":       (rec.get("registered") or "")[:10],
         "sepa":             rec.get("sepa") or "",
-        "pvn_numurs":       "",  # nav pieejams UR datos
+        "pvn_numurs":       pvn.get("pvn_numurs", ""),
+        "pvn_aktīvs":       pvn.get("pvn_aktīvs"),   # True / False / None
+        "pvn_reģ":          pvn.get("pvn_reģ", ""),
+        "pvn_izsl":         pvn.get("pvn_izsl", ""),
         "url":              f"https://ur.gov.lv/lv/meklesana/?term={regcode_str}",
     }
 
@@ -1079,11 +1128,20 @@ def _rekvizitu_konteksts(rek: dict) -> str:
         ("Reģ. nr.",         rek.get("reg_numurs", "")),
         ("Juridiskā adrese", rek.get("juridiska_adrese", "")),
         ("Reģistrēts",       rek.get("registrēts", "")),
-        ("PVN nr.",          rek.get("pvn_numurs", "")),
     ]
     for label, val in lauki:
         if val:
             rindas.append(f"  {label}: {val}")
+
+    # PVN statuss
+    pvn_aktīvs = rek.get("pvn_aktīvs")
+    if pvn_aktīvs is True:
+        pvn_rinda = f"  PVN: {rek.get('pvn_numurs', '')} — aktīvs maksātājs (reģ. {rek.get('pvn_reģ', '')})"
+        rindas.append(pvn_rinda)
+    elif pvn_aktīvs is False:
+        rindas.append("  PVN: nav reģistrēts kā PVN maksātājs")
+    # pvn_aktīvs is None → API kļūda, nerakstām neko
+
     return "\n".join(rindas)
 
 
@@ -1415,12 +1473,17 @@ def main():
                     ("reg_numurs",       "Reģ. nr."),
                     ("juridiska_adrese", "Juridiskā adrese"),
                     ("registrēts",       "Reģistrēts"),
-                    ("pvn_numurs",       "PVN nr."),
                     ("sepa",             "SEPA"),
                 ]:
                     val = rek.get(atslega, "")
                     if val:
                         st.caption(f"**{nosaukums}:** {val}")
+                # PVN statuss
+                pvn_aktīvs = rek.get("pvn_aktīvs")
+                if pvn_aktīvs is True:
+                    st.caption(f"**PVN:** ✅ {rek.get('pvn_numurs','')} (reģ. {rek.get('pvn_reģ','')})")
+                elif pvn_aktīvs is False:
+                    st.caption("**PVN:** ❌ nav reģistrēts")
                 st.markdown(f"[🔗 UR.gov.lv]({rek.get('url', '')})")
 
         st.divider()
