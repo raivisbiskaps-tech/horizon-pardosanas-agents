@@ -1293,21 +1293,10 @@ def main():
                     for src in msg["sources"]:
                         st.text(f"• {src}")
 
-    # ── Balss ievade ─────────────────────────────────────────────────────────
-    audio = st.audio_input("🎙️ Ierunā jautājumu", key="audio_rec")
-    if audio and not st.session_state.get("audio_processed"):
-        with st.spinner("Atpazīstu runu..."):
-            voice_text = transcribe_audio(audio.read())
-        if voice_text:
-            st.session_state.voice_input = voice_text
-        st.session_state.audio_processed = True
-        st.rerun()
-
     # ── Jautājuma ievade ──────────────────────────────────────────────────────
-    _typed    = st.chat_input("Raksti vai ierunā jautājumu...")
-    question  = st.session_state.pop("voice_input", None) or _typed
+    _typed   = st.chat_input("Raksti vai ierunā jautājumu...")
+    question = st.session_state.pop("voice_input", None) or _typed
     if question:
-        st.session_state.audio_processed = False
         st.session_state.messages.append({"role": "user", "content": question})
         with st.chat_message("user"):
             st.markdown(question)
@@ -1438,6 +1427,23 @@ def main():
                     if val:
                         st.caption(f"**{nosaukums}:** {val}")
                 st.markdown(f"[🔗 firmas.lv]({rek.get('url', '')})")
+
+        st.divider()
+
+        # ── Balss ievade ──────────────────────────────────────────────────────
+        st.header("🎙️ Balss ievade")
+        audio = st.audio_input("Ierunā jautājumu", key="audio_rec")
+        if audio and not st.session_state.get("audio_processed"):
+            with st.spinner("Atpazīstu runu..."):
+                voice_text = transcribe_audio(audio.read())
+            if voice_text:
+                st.session_state.voice_input = voice_text
+                st.session_state.audio_processed = True
+                st.rerun()
+            else:
+                st.session_state.audio_processed = True
+        if not audio:
+            st.session_state.audio_processed = False
 
         st.divider()
 
