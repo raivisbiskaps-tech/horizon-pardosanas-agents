@@ -1323,8 +1323,9 @@ def main():
     if text_input:
         question = text_input
     elif audio_result and audio_result.get("type") == "audio":
-        # Unikāls ID — novērš tās pašas audio paketes atkārtotu apstrādi
-        audio_id = audio_result["data"][:60]
+        # Unikāls ID — garums + beigu baiti (WebM sākums ir identisks visiem ierakstiem!)
+        _d = audio_result["data"]
+        audio_id = f"{len(_d)}-{_d[-40:]}"
         if audio_id != st.session_state.processed_audio_id:
             st.session_state.processed_audio_id = audio_id
             import base64 as _b64
