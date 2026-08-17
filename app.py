@@ -1314,17 +1314,26 @@ def main():
 
     if "mic_counter" not in st.session_state:
         st.session_state.mic_counter = 0
+    if "processed_audio_id" not in st.session_state:
+        st.session_state.processed_audio_id = None
+
     audio_result = mic_button(reset_counter=st.session_state.mic_counter)
 
     question = None
     if text_input:
         question = text_input
     elif audio_result and audio_result.get("type") == "audio":
-        import base64 as _b64
-        audio_bytes = _b64.b64decode(audio_result["data"])
-        with st.spinner("Atpazīstu runu..."):
-            question = transcribe_audio(audio_bytes, audio_result.get("mimeType", "audio/webm"))
-        st.session_state.mic_counter += 1
+        # Unikāls ID — novērš tās pašas audio paketes atkārtotu apstrādi
+        audio_id = audio_result["data"][:60]
+        if audio_id != st.session_state.processed_audio_id:
+            st.session_state.processed_audio_id = audio_id
+            import base64 as _b64
+            audio_bytes = _b64.b64decode(audio_result["data"])
+            with st.spinner("Atpazīstu runu..."):
+                question = transcribe_audio(audio_bytes, audio_result.get("mimeType", "audio/webm"))
+            st.session_state.mic_counter += 1
+            if not question:
+                st.warning("⚠️ Neizdevās atpazīt runu — mēģini vēlreiz.")
 
     if question:
         st.session_state.messages.append({"role": "user", "content": question})
