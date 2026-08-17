@@ -17,7 +17,6 @@ html, body { width: 100%; height: 100%; background: transparent; overflow: hidde
 }
 #btn:hover { background: rgba(0,0,0,.08); }
 
-/* Pulsa animācija ierakstot */
 #btn.rec::before {
     content: '';
     position: absolute;
@@ -30,23 +29,6 @@ html, body { width: 100%; height: 100%; background: transparent; overflow: hidde
     0%   { transform: scale(1);   opacity: .8; }
     100% { transform: scale(1.5); opacity: 0;  }
 }
-
-/* Klusuma indikators — tukšs aplis kas piepildās */
-#silence-ring {
-    position: absolute;
-    inset: -5px;
-    border-radius: 50%;
-    display: none;
-}
-#silence-ring circle {
-    fill: none;
-    stroke: #ef4444;
-    stroke-width: 3;
-    stroke-linecap: round;
-    transform: rotate(-90deg);
-    transform-origin: 50% 50%;
-    transition: stroke-dashoffset .1s linear;
-}
 </style>
 </head>
 <body>
@@ -55,7 +37,7 @@ html, body { width: 100%; height: 100%; background: transparent; overflow: hidde
 <script>
 "use strict";
 
-/* ── Streamlit protokols ──────────────────────────────────────────────────── */
+/* ── Streamlit protokols ─────────────────────────────────────────────── */
 var _lastCounter = -1;
 
 function post(msg) {
@@ -73,7 +55,7 @@ window.addEventListener('message', function(ev) {
 post({ type: 'streamlit:setFrameHeight', height: 36 });
 post({ type: 'streamlit:componentReady', apiVersion: 1 });
 
-/* ── Pozicionēšana ────────────────────────────────────────────────────────── */
+/* ── Pozicionēšana ───────────────────────────────────────────────────── */
 var SZ = 36;
 
 function fix() {
@@ -85,13 +67,10 @@ function fix() {
             try { if (frames[i].contentWindow === window) { me = frames[i]; break; } } catch(e) {}
         }
         if (!me) return;
-
         var target = me.parentElement;
         if (!target || target === pd.body) return;
-
         var sendBtn = pd.querySelector('[data-testid="stBottom"] button');
         if (!sendBtn) return;
-
         var r = sendBtn.getBoundingClientRect();
         var W = window.parent;
         target.style.cssText =
@@ -108,16 +87,16 @@ fix(); setTimeout(fix, 300); setTimeout(fix, 800);
 setInterval(fix, 1500);
 window.parent.addEventListener('resize', fix);
 
-/* ── Klusuma detektors ────────────────────────────────────────────────────── */
-var SILENCE_DELAY_MS  = 1500;  // ms klusuma pirms apstājas
-var CALIB_MS          = 600;   // ms fona trokšņa kalibrēšanai
-// speechThreshold un silenceThreshold tiek aprēķināti dinamiskistart
+/* ── Ieraksts ────────────────────────────────────────────────────────── */
+var SILENCE_DELAY_MS = 1500;
+var CALIB_MS         = 600;
+var MAX_REC_MS       = 30000;  // hard limit: 30s
 
-var btn         = document.getElementById('btn');
+var btn           = document.getElementById('btn');
 var mediaRecorder = null, chunks = [], recording = false;
-var audioCtx    = null, analyser = null, rafId = null;
-var silenceStart = null;        // kad sākās klusums (null = runā)
-var silenceTimer = null;
+var audioCtx      = null, analyser = null;
+var checkInterval = null;   // setInterval ID — aizvietojam requestAnimationFrame
+var silenceStart  = null;
 
 btn.addEventListener('click', function() {
     if (recording) stopRec(true); else startRec();
@@ -127,10 +106,10 @@ function startRec() {
     navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
         chunks = [];
 
-        /* MediaRecorder */
         var mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
                  : MediaRecorder.isTypeSupported('audio/webm')             ? 'audio/webm'
                  : 'audio/ogg';
+
         mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
         mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) chunks.push(e.data); };
         mediaRecorder.onstop = function() {
@@ -144,7 +123,7 @@ function startRec() {
         };
         mediaRecorder.start();
 
-        /* Web Audio — klusuma detektors */
+        /* Web Audio */
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         var src  = audioCtx.createMediaStreamSource(stream);
         analyser = audioCtx.createAnalyser();
@@ -152,8 +131,6 @@ function startRec() {
         src.connect(analyser);
 
         var buf = new Uint8Array(analyser.fftSize);
-        silenceStart = null;
-        var speechThresh = 0.05;  // pārrakstīs pēc kalibrēšanas
 
         function getRms() {
             analyser.getByteTimeDomainData(buf);
@@ -165,55 +142,56 @@ function startRec() {
             return Math.sqrt(sum / buf.length);
         }
 
-        /* Kalibrē fona troksni CALIB_MS ms */
-        var calibSamples = [], calibStart = Date.now();
+        /* Kalibrēšana */
+        recording = true;
+        btn.classList.add('rec');
         btn.style.opacity = '0.5';
         btn.title = 'Kalibrē...';
 
-        function calibrate() {
-            if (!recording) return;
+        var calibSamples = [];
+        var calibStart   = Date.now();
+        var recStart     = Date.now();
+        var speechThresh = 0.05;
+
+        var calibInterval = setInterval(function() {
             calibSamples.push(getRms());
-            if (Date.now() - calibStart < CALIB_MS) {
-                rafId = requestAnimationFrame(calibrate);
-            } else {
-                var noise = calibSamples.reduce(function(a,b){return a+b;},0) / calibSamples.length;
-                /* Slieksnis: 6x fona troksnis, minimums 0.05 */
+            if (Date.now() - calibStart >= CALIB_MS) {
+                clearInterval(calibInterval);
+
+                var noise = calibSamples.reduce(function(a, b) { return a + b; }, 0) / calibSamples.length;
                 speechThresh = Math.max(noise * 6, 0.05);
                 btn.style.opacity = '1';
                 btn.title = 'Runā... (klikšķis aptur)';
-                /* Neliels grācijas periods pirms klusuma detektors sāk darbu */
-                silenceStart = Date.now();
-                rafId = requestAnimationFrame(checkSilence);
+
+                silenceStart = Date.now();  /* taimeris sākas uzreiz pēc kalibrēšanas */
+
+                /* Klusuma detektors — setInterval katras 50ms */
+                checkInterval = setInterval(function() {
+                    if (!recording) { clearInterval(checkInterval); return; }
+
+                    /* Hard limit */
+                    if (Date.now() - recStart >= MAX_REC_MS) {
+                        clearInterval(checkInterval);
+                        stopRec(true);
+                        return;
+                    }
+
+                    var rms = getRms();
+
+                    if (rms >= speechThresh) {
+                        silenceStart = Date.now();
+                        btn.style.opacity = '1';
+                    } else {
+                        var elapsed = Date.now() - silenceStart;
+                        btn.style.opacity = Math.max(0.35, 1 - elapsed / SILENCE_DELAY_MS);
+                        if (elapsed >= SILENCE_DELAY_MS) {
+                            clearInterval(checkInterval);
+                            stopRec(true);
+                        }
+                    }
+                }, 50);
             }
-        }
-
-        function checkSilence() {
-            if (!recording) return;
-            var rms = getRms();
-
-            if (rms >= speechThresh) {
-                /* Runa — atiestata klusuma taimeri */
-                silenceStart = Date.now();
-                btn.style.opacity = '1';
-            } else {
-                /* Klusums — taimeris tek */
-                var elapsed = Date.now() - silenceStart;
-                btn.style.opacity = Math.max(0.35, 1 - elapsed / SILENCE_DELAY_MS);
-                if (elapsed >= SILENCE_DELAY_MS) {
-                    stopRec(true);
-                    return;
-                }
-            }
-
-            rafId = requestAnimationFrame(checkSilence);
-        }
-
-        calibrate();
-
-        recording = true;
-        btn.textContent = '🎙️';
-        btn.classList.add('rec');
-        btn.title = 'Runā... (klikšķis aptur)';
+        }, 30);
 
     }).catch(function(err) { alert('Mikrofons nav pieejams: ' + err.message); });
 }
@@ -221,7 +199,7 @@ function startRec() {
 function stopRec(send) {
     if (!recording) return;
     recording = false;
-    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    if (checkInterval) { clearInterval(checkInterval); checkInterval = null; }
     silenceStart = null;
     btn.style.opacity = '1';
     btn.classList.remove('rec');
@@ -231,7 +209,6 @@ function stopRec(send) {
 
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         if (!send) {
-            /* Atcēla — izmet datus */
             mediaRecorder.ondataavailable = null;
             mediaRecorder.onstop = function() {};
         }
