@@ -20,7 +20,4 @@ markdown>=3.6
 # Web saskarne
 streamlit>=1.40.0
 
-# Balss ievade
-groq>=0.9.0
-
 # Vides mainīgie
