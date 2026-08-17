@@ -1310,56 +1310,6 @@ def main():
                         st.text(f"• {src}")
 
     # ── Čata ievade ───────────────────────────────────────────────────────────────
-    # Fiziski pārvieto mic iframe uz document.body — tā tas nevar tikt apslēpts
-    # ar Streamlit konteinera overflow:hidden vai transform.
-    st.markdown("""<script>
-(function () {
-    var SZ = 36;
-
-    /* Fiksēts konteiners pie body — izveido vienu reizi */
-    var bar = document.getElementById('_mic_bar');
-    if (!bar) {
-        bar = document.createElement('div');
-        bar.id = '_mic_bar';
-        bar.style.cssText = 'position:fixed;z-index:10001;width:' + SZ + 'px;height:' + SZ + 'px;display:none;';
-        document.body.appendChild(bar);
-    }
-
-    function position() {
-        var sendBtn = document.querySelector('[data-testid="stBottom"] button');
-        if (!sendBtn) return;
-        var r = sendBtn.getBoundingClientRect();
-        bar.style.bottom = Math.round(window.innerHeight - r.top - r.height / 2 - SZ / 2) + 'px';
-        bar.style.right  = Math.round(window.innerWidth  - r.left + 6) + 'px';
-        bar.style.display = 'block';
-    }
-
-    function moveIframe() {
-        var mic = document.querySelector('iframe[title="mic_button"]');
-        if (!mic || bar.contains(mic)) { position(); return; }
-
-        /* Sakļauj oriģinālo vietu plūsmā */
-        var wrap = mic.parentElement;
-        while (wrap && wrap !== document.body) {
-            if (wrap.getAttribute('data-testid') === 'stElementContainer') {
-                wrap.style.cssText = 'height:0!important;min-height:0!important;overflow:hidden!important;padding:0!important;margin:0!important;';
-                break;
-            }
-            wrap = wrap.parentElement;
-        }
-
-        /* Pārvieto iframe uz fiksēto konteineru */
-        mic.style.cssText = 'width:' + SZ + 'px!important;height:' + SZ + 'px!important;border:none!important;display:block!important;background:transparent!important;';
-        bar.appendChild(mic);
-        position();
-    }
-
-    moveIframe();
-    new MutationObserver(moveIframe).observe(document.body, { childList: true, subtree: true });
-    window.addEventListener('resize', position);
-})();
-</script>""", unsafe_allow_html=True)
-
     text_input = st.chat_input("Raksti vai ierunā jautājumu...")
 
     if "mic_counter" not in st.session_state:

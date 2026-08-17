@@ -12,13 +12,12 @@ html, body { width: 100%; height: 100%; background: transparent; overflow: hidde
     cursor: pointer;
     font-size: 20px;
     display: flex; align-items: center; justify-content: center;
-    transition: background .15s;
 }
-#btn:hover { background: rgba(0,0,0,.07); }
+#btn:hover { background: rgba(0,0,0,.08); }
 #btn.recording { animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse {
     0%,100% { filter: drop-shadow(0 0 0px rgba(220,38,38,0)); }
-    50%      { filter: drop-shadow(0 0 6px rgba(220,38,38,.8)); }
+    50%      { filter: drop-shadow(0 0 7px rgba(220,38,38,.9)); }
 }
 </style>
 </head>
@@ -26,27 +25,90 @@ html, body { width: 100%; height: 100%; background: transparent; overflow: hidde
 <button id="btn" title="Ierunāt">🎙️</button>
 <script>
 "use strict";
-var btn = document.getElementById('btn');
-var mediaRecorder = null, chunks = [], recording = false;
+
+/* ── Streamlit protokols ─────────────────────────────────────────────────── */
 var _lastCounter = -1;
 
 function post(msg) {
     window.parent.postMessage(Object.assign({ isStreamlitMessage: true }, msg), '*');
 }
-function setHeight()  { post({ type: 'streamlit:setFrameHeight', height: 38 }); }
-function setValue(v)  { post({ type: 'streamlit:setComponentValue', value: v, dataType: 'json' }); }
+function setValue(v) { post({ type: 'streamlit:setComponentValue', value: v, dataType: 'json' }); }
 
 window.addEventListener('message', function(ev) {
     if (!ev.data || ev.data.type !== 'streamlit:render') return;
     var c = (ev.data.args || {}).reset_counter;
     if (c == null) c = 0;
-    if (c !== _lastCounter) {
-        _lastCounter = c;
-        if (recording) stopRec();
-    }
+    if (c !== _lastCounter) { _lastCounter = c; if (recording) stopRec(); }
 });
 
-btn.addEventListener('click', function() {
+post({ type: 'streamlit:setFrameHeight', height: 36 });
+post({ type: 'streamlit:componentReady', apiVersion: 1 });
+
+/* ── Pašpārvietošanās uz parent dokumentu ───────────────────────────────── */
+/* Komponents aizvieto sevi document.body līmenī, kur position:fixed darbojas
+   pareizi — Streamlit's konteineri nevar to apslēpt ar overflow vai transform. */
+var SZ = 36;
+
+function findMe(pd) {
+    var frames = pd.querySelectorAll('iframe');
+    for (var i = 0; i < frames.length; i++) {
+        try { if (frames[i].contentWindow === window) return frames[i]; } catch(e) {}
+    }
+    return null;
+}
+
+function reposition(me, pd) {
+    var btn = pd.querySelector('[data-testid="stBottom"] button');
+    if (!btn) return;
+    var r = btn.getBoundingClientRect();
+    me.style.bottom = Math.round(window.parent.innerHeight - r.top - r.height / 2 - SZ / 2) + 'px';
+    me.style.right  = Math.round(window.parent.innerWidth  - r.left + 6) + 'px';
+}
+
+function relocate() {
+    try {
+        var pd = window.parent.document;
+        var me = findMe(pd);
+        if (!me) return;
+
+        if (me.parentElement !== pd.body) {
+            /* Sakļauj oriģinālo konteineru plūsmā */
+            var wrap = me.parentElement;
+            while (wrap && wrap !== pd.body) {
+                if (wrap.getAttribute && wrap.getAttribute('data-testid') === 'stElementContainer') {
+                    wrap.style.cssText = 'height:0!important;min-height:0!important;overflow:hidden!important;padding:0!important;margin:0!important;';
+                    break;
+                }
+                wrap = wrap.parentElement;
+            }
+            /* Pārvieto iframe uz body */
+            me.style.cssText =
+                'position:fixed!important;border:none!important;' +
+                'width:' + SZ + 'px!important;height:' + SZ + 'px!important;' +
+                'z-index:10001!important;background:transparent!important;';
+            pd.body.appendChild(me);
+        }
+
+        reposition(me, pd);
+    } catch(e) {
+        /* cross-origin vai cita kļūda — klusam ignorē */
+    }
+}
+
+/* Izpilda tūlīt un atkārtoti līdz st.chat_input ielādējas */
+relocate();
+var _tries = 0;
+var _iv = setInterval(function() {
+    relocate();
+    if (++_tries > 30) clearInterval(_iv);
+}, 200);
+window.parent.addEventListener('resize', function() { relocate(); });
+
+/* ── Mikrofons ───────────────────────────────────────────────────────────── */
+var micBtn = document.getElementById('btn');
+var mediaRecorder = null, chunks = [], recording = false;
+
+micBtn.addEventListener('click', function() {
     if (recording) stopRec(); else startRec();
 });
 
@@ -69,26 +131,19 @@ function startRec() {
         };
         mediaRecorder.start();
         recording = true;
-        btn.textContent = '⏹️';
-        btn.classList.add('recording');
-        btn.title = 'Apturēt';
-    }).catch(function(err) {
-        alert('Mikrofons nav pieejams: ' + err.message);
-    });
+        micBtn.textContent = '⏹️';
+        micBtn.classList.add('recording');
+    }).catch(function(err) { alert('Mikrofons nav pieejams: ' + err.message); });
 }
 
 function stopRec() {
     if (mediaRecorder && recording) {
         mediaRecorder.stop();
         recording = false;
-        btn.textContent = '🎙️';
-        btn.classList.remove('recording');
-        btn.title = 'Ierunāt';
+        micBtn.textContent = '🎙️';
+        micBtn.classList.remove('recording');
     }
 }
-
-setHeight();
-post({ type: 'streamlit:componentReady', apiVersion: 1 });
 </script>
 </body>
 </html>
