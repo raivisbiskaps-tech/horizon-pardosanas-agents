@@ -14,7 +14,7 @@ html, body { width: 100%; height: 100%; background: transparent; overflow: hidde
     display: flex; align-items: center; justify-content: center;
 }
 #btn:hover { background: rgba(0,0,0,.08); }
-#btn.recording { animation: pulse 1.2s ease-in-out infinite; }
+#btn.rec { animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse {
     0%,100% { filter: drop-shadow(0 0 0px rgba(220,38,38,0)); }
     50%      { filter: drop-shadow(0 0 7px rgba(220,38,38,.9)); }
@@ -26,7 +26,7 @@ html, body { width: 100%; height: 100%; background: transparent; overflow: hidde
 <script>
 "use strict";
 
-/* ── Streamlit protokols ─────────────────────────────────────────────────── */
+/* ── Streamlit protokols ──────────────────────────────────────────────────── */
 var _lastCounter = -1;
 
 function post(msg) {
@@ -44,71 +44,66 @@ window.addEventListener('message', function(ev) {
 post({ type: 'streamlit:setFrameHeight', height: 36 });
 post({ type: 'streamlit:componentReady', apiVersion: 1 });
 
-/* ── Pašpārvietošanās uz parent dokumentu ───────────────────────────────── */
-/* Komponents aizvieto sevi document.body līmenī, kur position:fixed darbojas
-   pareizi — Streamlit's konteineri nevar to apslēpt ar overflow vai transform. */
+/* ── Pozicionēšana — BEZ iframe pārvietošanas ───────────────────────────── */
+/* Iframe paliek Streamlit DOM kokā (lai saglabātu saziņu).
+   Tā vietā parent div iegūst position:fixed.                               */
 var SZ = 36;
 
-function findMe(pd) {
-    var frames = pd.querySelectorAll('iframe');
-    for (var i = 0; i < frames.length; i++) {
-        try { if (frames[i].contentWindow === window) return frames[i]; } catch(e) {}
-    }
-    return null;
-}
-
-function reposition(me, pd) {
-    var btn = pd.querySelector('[data-testid="stBottom"] button');
-    if (!btn) return;
-    var r = btn.getBoundingClientRect();
-    me.style.bottom = Math.round(window.parent.innerHeight - r.top - r.height / 2 - SZ / 2) + 'px';
-    me.style.right  = Math.round(window.parent.innerWidth  - r.left + 6) + 'px';
-}
-
-function relocate() {
+function fix() {
     try {
         var pd = window.parent.document;
-        var me = findMe(pd);
+
+        /* Atrod šo iframe parent dokumentā */
+        var me = null;
+        var frames = pd.querySelectorAll('iframe');
+        for (var i = 0; i < frames.length; i++) {
+            try { if (frames[i].contentWindow === window) { me = frames[i]; break; } } catch(e) {}
+        }
         if (!me) return;
 
-        if (me.parentElement !== pd.body) {
-            /* Sakļauj oriģinālo konteineru plūsmā */
-            var wrap = me.parentElement;
-            while (wrap && wrap !== pd.body) {
-                if (wrap.getAttribute && wrap.getAttribute('data-testid') === 'stElementContainer') {
-                    wrap.style.cssText = 'height:0!important;min-height:0!important;overflow:hidden!important;padding:0!important;margin:0!important;';
-                    break;
-                }
-                wrap = wrap.parentElement;
-            }
-            /* Pārvieto iframe uz body */
-            me.style.cssText =
-                'position:fixed!important;border:none!important;' +
-                'width:' + SZ + 'px!important;height:' + SZ + 'px!important;' +
-                'z-index:10001!important;background:transparent!important;';
-            pd.body.appendChild(me);
-        }
+        /* Tūlītējais vecāks — tas, kuram piešķiram fixed */
+        var target = me.parentElement;
+        if (!target || target === pd.body) return;
 
-        reposition(me, pd);
-    } catch(e) {
-        /* cross-origin vai cita kļūda — klusam ignorē */
-    }
+        /* Atrod st.chat_input sūtīšanas pogu */
+        var sendBtn = pd.querySelector('[data-testid="stBottom"] button');
+        if (!sendBtn) return;
+
+        var r = sendBtn.getBoundingClientRect();
+        var W = window.parent;
+        var bottom = Math.round(W.innerHeight - r.top - r.height / 2 - SZ / 2);
+        var right  = Math.round(W.innerWidth  - r.left + 6);
+
+        /* Piešķir fixed vecākajam elementam */
+        target.style.cssText =
+            'position:fixed!important;' +
+            'bottom:'  + bottom + 'px!important;' +
+            'right:'   + right  + 'px!important;' +
+            'width:'   + SZ + 'px!important;' +
+            'height:'  + SZ + 'px!important;' +
+            'z-index:10001!important;' +
+            'margin:0!important;padding:0!important;overflow:visible!important;';
+
+        /* Iframe izmērs */
+        me.style.width  = SZ + 'px';
+        me.style.height = SZ + 'px';
+        me.style.border = 'none';
+
+    } catch(e) { /* cross-origin — ignorē */ }
 }
 
-/* Izpilda tūlīt un atkārtoti līdz st.chat_input ielādējas */
-relocate();
-var _tries = 0;
-var _iv = setInterval(function() {
-    relocate();
-    if (++_tries > 30) clearInterval(_iv);
-}, 200);
-window.parent.addEventListener('resize', function() { relocate(); });
+/* Izpilda tūlīt, pēc īsa kavējuma, un atkārtoti lai izturētu pārrenderēšanu */
+fix();
+setTimeout(fix, 300);
+setTimeout(fix, 800);
+setInterval(fix, 1500);
+window.parent.addEventListener('resize', fix);
 
-/* ── Mikrofons ───────────────────────────────────────────────────────────── */
-var micBtn = document.getElementById('btn');
+/* ── Mikrofons ────────────────────────────────────────────────────────────── */
+var btn = document.getElementById('btn');
 var mediaRecorder = null, chunks = [], recording = false;
 
-micBtn.addEventListener('click', function() {
+btn.addEventListener('click', function() {
     if (recording) stopRec(); else startRec();
 });
 
@@ -131,8 +126,8 @@ function startRec() {
         };
         mediaRecorder.start();
         recording = true;
-        micBtn.textContent = '⏹️';
-        micBtn.classList.add('recording');
+        btn.textContent = '⏹️';
+        btn.classList.add('rec');
     }).catch(function(err) { alert('Mikrofons nav pieejams: ' + err.message); });
 }
 
@@ -140,8 +135,8 @@ function stopRec() {
     if (mediaRecorder && recording) {
         mediaRecorder.stop();
         recording = false;
-        micBtn.textContent = '🎙️';
-        micBtn.classList.remove('recording');
+        btn.textContent = '🎙️';
+        btn.classList.remove('rec');
     }
 }
 </script>
