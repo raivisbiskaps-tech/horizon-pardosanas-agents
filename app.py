@@ -1318,7 +1318,42 @@ def main():
                     for src in msg["sources"]:
                         st.text(f"• {src}")
 
-    # ── Čata ievade ar integrētu mic pogu ────────────────────────────────────
+    # ── Čata ievade ar integrētu mic pogu (fiksēta apakšā) ───────────────────
+    st.markdown("""
+<style>
+/* Fiksē ievades komponenta konteineru pie lapas apakšas */
+.stCustomComponentV1:has(iframe[title="chat_input_mic"]) {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 999 !important;
+    background: white !important;
+    padding: 10px 24px 14px !important;
+    border-top: 1px solid #e9e9e9 !important;
+    box-shadow: 0 -2px 8px rgba(0,0,0,.07) !important;
+}
+/* Vieta apakšā, lai čata vēsture nesegtos aiz ievades */
+.block-container {
+    padding-bottom: 90px !important;
+}
+</style>
+<script>
+(function () {
+    function adjustLeft() {
+        var bar = document.querySelector('.stCustomComponentV1:has(iframe[title="chat_input_mic"])');
+        if (!bar) return;
+        var sb = document.querySelector('[data-testid="stSidebar"]');
+        var sbW = sb ? sb.getBoundingClientRect().width : 0;
+        bar.style.left = sbW + 'px';
+    }
+    adjustLeft();
+    new MutationObserver(adjustLeft).observe(document.body, {childList: true, subtree: true});
+    window.addEventListener('resize', adjustLeft);
+})();
+</script>
+""", unsafe_allow_html=True)
+
     if "input_counter" not in st.session_state:
         st.session_state.input_counter = 0
 
