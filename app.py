@@ -1293,58 +1293,52 @@ def main():
                     for src in msg["sources"]:
                         st.text(f"• {src}")
 
-    # ── Ievades josla: mic poga + teksts + sūtīt ─────────────────────────────
-    st.markdown("""
-    <style>
-    /* Sticky ievades josla apakšā */
-    div[data-testid="stBottom"] { display: none; }
-    .ievades-josla {
-        position: fixed;
-        bottom: 0; left: 0; right: 0;
-        background: var(--background-color);
-        border-top: 1px solid rgba(49,51,63,0.15);
-        padding: 10px 16px 12px 16px;
-        z-index: 999;
-    }
-    .ievades-josla [data-testid="stHorizontalBlock"] { gap: 6px; align-items: center; }
-    .ievades-josla [data-testid="stForm"] { border: none !important; padding: 0 !important; }
-    .ievades-josla input[type="text"] {
-        border-radius: 20px !important;
-        padding: 8px 14px !important;
-    }
-    /* Mic poga — apaļa */
-    .ievades-josla iframe { border-radius: 50%; }
-    /* Atstarpe apakšā lai pēdējais ziņojums neredzams */
-    section[data-testid="stMain"] > div { padding-bottom: 80px; }
-    </style>
-    """, unsafe_allow_html=True)
-
+    # ── Balss ievade ─────────────────────────────────────────────────────────
     from streamlit_mic_recorder import mic_recorder
+    import streamlit.components.v1 as _components
 
-    with st.container(key="ievades-josla"):
-        st.markdown('<div class="ievades-josla">', unsafe_allow_html=True)
-        col_mic, col_form = st.columns([1, 11])
+    col_mic, _ = st.columns([1, 20])
+    with col_mic:
+        audio_data = mic_recorder(
+            start_prompt="🎙️",
+            stop_prompt="⏹️",
+            just_once=True,
+            use_container_width=True,
+            key="mic_recorder",
+        )
 
-        with col_mic:
-            audio_data = mic_recorder(
-                start_prompt="🎙️",
-                stop_prompt="⏹️",
-                just_once=True,
-                use_container_width=True,
-                key="mic_recorder",
-            )
-
-        with col_form:
-            with st.form("chat_form", clear_on_submit=True, border=False):
-                col_text, col_send = st.columns([10, 1])
-                with col_text:
-                    typed = st.text_input(
-                        "", placeholder="Raksti vai ierunā jautājumu...",
-                        label_visibility="collapsed",
-                    )
-                with col_send:
-                    submitted = st.form_submit_button("▶", use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # JS: fiksē mic iframe kreisajā pusē pie chat input
+    _components.html("""
+<script>
+(function() {
+    var pd = window.parent.document;
+    function fix() {
+        var mic  = pd.querySelector('iframe[title*="mic_recorder"]');
+        var chat = pd.querySelector('[data-testid="stChatInputContainer"]');
+        if (!mic || !chat) return;
+        var r   = chat.getBoundingClientRect();
+        var col = mic.closest('[data-testid="stColumn"]') || mic.parentElement;
+        Object.assign(col.style, {
+            position:        'fixed',
+            bottom:          (window.parent.innerHeight - r.bottom) + 'px',
+            left:            (r.left + 6) + 'px',
+            width:           '42px',
+            height:          r.height + 'px',
+            zIndex:          '9999',
+            display:         'flex',
+            alignItems:      'center',
+            justifyContent:  'center',
+            pointerEvents:   'auto',
+        });
+        mic.style.cssText = 'width:42px;height:42px;border:none;background:transparent;';
+        chat.style.paddingLeft = '54px';
+    }
+    fix();
+    new MutationObserver(fix).observe(pd.body, {childList: true, subtree: true});
+    window.parent.addEventListener('resize', fix);
+})();
+</script>
+""", height=0, width=0)
 
     if audio_data:
         with st.spinner("Atpazīstu runu..."):
@@ -1353,7 +1347,9 @@ def main():
             st.session_state.voice_input = voice_text
             st.rerun()
 
-    question = st.session_state.pop("voice_input", None) or (typed if submitted else None)
+    # ── Teksta ievade ─────────────────────────────────────────────────────────
+    _typed   = st.chat_input("Raksti vai ierunā jautājumu...")
+    question = st.session_state.pop("voice_input", None) or _typed
     if question:
         st.session_state.messages.append({"role": "user", "content": question})
         with st.chat_message("user"):
