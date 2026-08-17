@@ -207,10 +207,13 @@ def transcribe_audio(audio_bytes: bytes, mime_type: str = "audio/webm") -> str |
 
 # ── Custom čata ievades komponents ────────────────────────────────────────────
 
-import streamlit.components.v1 as _stc
-
-_CHAT_INPUT_MIC_PATH = os.path.join(BASE_DIR, "components", "chat_input_mic")
-_chat_input_mic_fn   = _stc.declare_component("chat_input_mic", path=_CHAT_INPUT_MIC_PATH)
+@st.cache_resource
+def _get_chat_input_mic_fn():
+    """Reģistrē komponentu vienreiz — cache_resource nodrošina, ka tas notiek
+    tikai pēc Streamlit inicializācijas (ne moduļa ielādes laikā)."""
+    import streamlit.components.v1 as _stc
+    path = os.path.join(BASE_DIR, "components", "chat_input_mic")
+    return _stc.declare_component("chat_input_mic", path=path)
 
 
 def chat_input_mic(reset_counter: int = 0) -> dict | None:
@@ -219,7 +222,8 @@ def chat_input_mic(reset_counter: int = 0) -> dict | None:
              {"type": "audio", "data": "<base64>", "mimeType": "audio/webm"}
     vai None, ja nav ievades.
     """
-    return _chat_input_mic_fn(reset_counter=reset_counter, key="chat_input_mic", default=None)
+    fn = _get_chat_input_mic_fn()
+    return fn(reset_counter=reset_counter, key="chat_input_mic", default=None)
 
 
 # ── RAG ───────────────────────────────────────────────────────────────────────
