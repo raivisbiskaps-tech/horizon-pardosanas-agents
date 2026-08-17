@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+    width: 100%; height: 100%;
+    background: transparent;
+    overflow: hidden;
+}
+#btn {
+    width: 100%; height: 100%;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s;
+}
+#btn:hover { background: rgba(0,0,0,.07); }
+#btn.recording {
+    animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+    0%,100% { filter: drop-shadow(0 0 0px rgba(220,38,38,0)); }
+    50%      { filter: drop-shadow(0 0 6px rgba(220,38,38,.8)); }
+}
+</style>
+</head>
+<body>
+<button id="btn" title="Ierunāt">🎙️</button>
+<script>
+"use strict";
+var btn = document.getElementById('btn');
+var mediaRecorder = null, chunks = [], recording = false;
+var _lastCounter = -1;
+
+function post(msg) {
+    window.parent.postMessage(Object.assign({ isStreamlitMessage: true }, msg), '*');
+}
+function setHeight()  { post({ type: 'streamlit:setFrameHeight', height: 38 }); }
+function setValue(v)  { post({ type: 'streamlit:setComponentValue', value: v, dataType: 'json' }); }
+
+window.addEventListener('message', function(ev) {
+    if (!ev.data || ev.data.type !== 'streamlit:render') return;
+    var c = (ev.data.args || {}).reset_counter;
+    if (c == null) c = 0;
+    if (c !== _lastCounter) {
+        _lastCounter = c;
+        if (recording) stopRec();
+    }
+});
+
+btn.addEventListener('click', function() {
+    if (recording) stopRec(); else startRec();
+});
+
+function startRec() {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+        chunks = [];
+        var mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+                 : MediaRecorder.isTypeSupported('audio/webm')             ? 'audio/webm'
+                 : 'audio/ogg';
+        mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
+        mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) chunks.push(e.data); };
+        mediaRecorder.onstop = function() {
+            var blob   = new Blob(chunks, { type: mime });
+            var reader = new FileReader();
+            reader.onloadend = function() {
+                setValue({ type: 'audio', data: reader.result.split(',')[1], mimeType: mime });
+            };
+            reader.readAsDataURL(blob);
+            stream.getTracks().forEach(function(t) { t.stop(); });
+        };
+        mediaRecorder.start();
+        recording = true;
+        btn.textContent = '⏹️';
+        btn.classList.add('recording');
+        btn.title = 'Apturēt';
+    }).catch(function(err) {
+        alert('Mikrofons nav pieejams: ' + err.message);
+    });
+}
+
+function stopRec() {
+    if (mediaRecorder && recording) {
+        mediaRecorder.stop();
+        recording = false;
+        btn.textContent = '🎙️';
+        btn.classList.remove('recording');
+        btn.title = 'Ierunāt';
+    }
+}
+
+setHeight();
+post({ type: 'streamlit:componentReady', apiVersion: 1 });
+</script>
+</body>
+</html>

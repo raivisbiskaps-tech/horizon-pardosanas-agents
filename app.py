@@ -205,25 +205,22 @@ def transcribe_audio(audio_bytes: bytes, mime_type: str = "audio/webm") -> str |
         return None
 
 
-# ── Custom čata ievades komponents ────────────────────────────────────────────
+# ── Mic pogas komponents ──────────────────────────────────────────────────────
 
 @st.cache_resource
-def _get_chat_input_mic_fn():
-    """Reģistrē komponentu vienreiz — cache_resource nodrošina, ka tas notiek
-    tikai pēc Streamlit inicializācijas (ne moduļa ielādes laikā)."""
+def _get_mic_button_fn():
+    """Reģistrē mic pogas komponentu vienreiz."""
     import streamlit.components.v1 as _stc
-    path = os.path.join(BASE_DIR, "components", "chat_input_mic")
-    return _stc.declare_component("chat_input_mic", path=path)
+    path = os.path.join(BASE_DIR, "components", "mic_button")
+    return _stc.declare_component("mic_button", path=path)
 
 
-def chat_input_mic(reset_counter: int = 0) -> dict | None:
-    """Teksta ievades lauks ar integrētu mic pogu.
-    Atgriež {"type": "text", "data": "..."} vai
-             {"type": "audio", "data": "<base64>", "mimeType": "audio/webm"}
-    vai None, ja nav ievades.
+def mic_button(reset_counter: int = 0) -> dict | None:
+    """Maza mic poga — atgriež {"type": "audio", "data": "<base64>", "mimeType": "..."}
+    vai None, ja nav ieraksta.
     """
-    fn = _get_chat_input_mic_fn()
-    return fn(reset_counter=reset_counter, key="chat_input_mic", default=None)
+    fn = _get_mic_button_fn()
+    return fn(reset_counter=reset_counter, key="mic_button", default=None)
 
 
 # ── RAG ───────────────────────────────────────────────────────────────────────
@@ -1318,144 +1315,133 @@ def main():
                     for src in msg["sources"]:
                         st.text(f"• {src}")
 
-    # ── Čata ievade ar integrētu mic pogu (fiksēta apakšā) ───────────────────
+    # ── Čata ievade: natīvais st.chat_input + mic poga kā pārklājums ────────────
 
-    # JS: meklē iframe pēc title un piepieto fiksētu konteineru lapas apakšā.
-    # Izmantojam MutationObserver, lai tas izturētu Streamlit pārrenderēšanu.
+    # JS novieto mic_button iframe tieši pa kreisi no st.chat_input nosūtīšanas
+    # pogas, un saliek komponenta normālā plūsmas vietu uz augstumu 0.
     st.markdown("""
-<style>
-#_chat_fixed_bar {
-    position: fixed !important;
-    bottom: 0 !important;
-    right: 0 !important;
-    z-index: 1000 !important;
-    background: white !important;
-    padding: 10px 24px 14px !important;
-    border-top: 1px solid #e9e9e9 !important;
-    box-shadow: 0 -2px 8px rgba(0,0,0,.07) !important;
-}
-.block-container { padding-bottom: 90px !important; }
-</style>
 <script>
 (function () {
-    /* Izveido fiksētu div vienu reizi */
-    var bar = document.getElementById('_chat_fixed_bar');
-    if (!bar) {
-        bar = document.createElement('div');
-        bar.id = '_chat_fixed_bar';
-        document.body.appendChild(bar);
+    function fix() {
+        var mic = document.querySelector('iframe[title="mic_button"]');
+        if (!mic) return;
+
+        // Sakļauj mic iframe vietu normālajā plūsmā
+        var wrap = mic.parentElement;
+        while (wrap && wrap !== document.body) {
+            if (wrap.getAttribute('data-testid') === 'stElementContainer') {
+                wrap.style.cssText =
+                    'height:0!important;overflow:hidden!important;' +
+                    'padding:0!important;margin:0!important;';
+                break;
+            }
+            wrap = wrap.parentElement;
+        }
+
+        // Atrod st.chat_input nosūtīšanas pogu
+        var sendBtn = document.querySelector('[data-testid="stBottom"] button');
+        if (!sendBtn) return;
+
+        var r   = sendBtn.getBoundingClientRect();
+        var sz  = 36;
+        var gap = 6;
+        Object.assign(mic.style, {
+            position : 'fixed',
+            bottom   : Math.round(window.innerHeight - r.top - r.height / 2 - sz / 2) + 'px',
+            right    : Math.round(window.innerWidth  - r.left + gap) + 'px',
+            width    : sz + 'px',
+            height   : sz + 'px',
+            border   : 'none',
+            zIndex   : '10001',
+            background: 'transparent',
+        });
     }
 
-    function moveIframe() {
-        var iframe = document.querySelector('iframe[title="chat_input_mic"]');
-        if (!iframe || bar.contains(iframe)) return;
-
-        /* Slēpj oriģinālo konteineru, lai neaizņem vietu */
-        var orig = iframe.closest('[data-testid="stElementContainer"]')
-                   || iframe.parentElement;
-        if (orig) { orig.style.height = '0'; orig.style.overflow = 'hidden'; }
-
-        bar.appendChild(iframe);
-        iframe.style.display = 'block';
-        iframe.style.width   = '100%';
-
-        /* Pielāgo platumu pēc sānjoslas */
-        var sb = document.querySelector('[data-testid="stSidebar"]');
-        bar.style.left = (sb ? sb.getBoundingClientRect().width : 0) + 'px';
-    }
-
-    moveIframe();
-    new MutationObserver(moveIframe).observe(document.body,
-        { childList: true, subtree: true });
-    window.addEventListener('resize', function () {
-        var sb = document.querySelector('[data-testid="stSidebar"]');
-        bar.style.left = (sb ? sb.getBoundingClientRect().width : 0) + 'px';
-    });
+    fix();
+    new MutationObserver(fix).observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('resize', fix);
 })();
 </script>
 """, unsafe_allow_html=True)
 
-    if "input_counter" not in st.session_state:
-        st.session_state.input_counter = 0
+    # Teksta ievade — Streamlit natīvais widgets, fiksēts apakšā automātiski
+    text_input = st.chat_input("Raksti vai ierunā jautājumu...")
 
-    # Konteiners jaunajiem ziņojumiem — DOM plūsmā PIRMS komponenta,
-    # tāpēc jauna atbilde nerenderējas zem ievades lauka.
-    new_msg_container = st.container()
+    # Mic poga — parādās blakus nosūtīšanas pogai
+    if "mic_counter" not in st.session_state:
+        st.session_state.mic_counter = 0
+    audio_result = mic_button(reset_counter=st.session_state.mic_counter)
 
-    result = chat_input_mic(reset_counter=st.session_state.input_counter)
+    # Nosaka jautājumu: teksts vai audio
     question = None
-
-    if result:
-        if result.get("type") == "text":
-            question = result["data"]
-        elif result.get("type") == "audio":
-            import base64 as _b64
-            audio_bytes = _b64.b64decode(result["data"])
-            with st.spinner("Atpazīstu runu..."):
-                question = transcribe_audio(audio_bytes, result.get("mimeType", "audio/webm"))
+    if text_input:
+        question = text_input
+    elif audio_result and audio_result.get("type") == "audio":
+        import base64 as _b64
+        audio_bytes = _b64.b64decode(audio_result["data"])
+        with st.spinner("Atpazīstu runu..."):
+            question = transcribe_audio(audio_bytes, audio_result.get("mimeType", "audio/webm"))
+        st.session_state.mic_counter += 1  # atiestatīt mic pogu
 
     if question:
-        with new_msg_container:
-            st.session_state.messages.append({"role": "user", "content": question})
-            with st.chat_message("user"):
-                st.markdown(question)
+        st.session_state.messages.append({"role": "user", "content": question})
+        with st.chat_message("user"):
+            st.markdown(question)
 
-            with st.chat_message("assistant"):
-                with st.spinner("Prātoju ..."):
+        with st.chat_message("assistant"):
+            with st.spinner("Prātoju ..."):
 
-                    # Automātiska rekvizītu iegūšana — ja nav jau iegūti
-                    if not st.session_state.get("klienta_rekviziti"):
-                        vaicajums = _detect_uznemums(question)
-                        if vaicajums:
-                            rek = fetch_firmas_lv(vaicajums)
-                            if "kļūda" not in rek:
-                                st.session_state.klienta_rekviziti = rek
+                # Automātiska rekvizītu iegūšana — ja nav jau iegūti
+                if not st.session_state.get("klienta_rekviziti"):
+                    vaicajums = _detect_uznemums(question)
+                    if vaicajums:
+                        rek = fetch_firmas_lv(vaicajums)
+                        if "kļūda" not in rek:
+                            st.session_state.klienta_rekviziti = rek
 
-                    # Ja rekvizīti tikko iegūti — pievieno kontekstu AI ziņojumam
-                    rek_konteksts = ""
-                    if st.session_state.get("klienta_rekviziti"):
-                        rek = st.session_state.klienta_rekviziti
-                        if _detect_uznemums(question):
-                            rek_konteksts = "\n\n" + _rekvizitu_konteksts(rek)
+                rek_konteksts = ""
+                if st.session_state.get("klienta_rekviziti"):
+                    rek = st.session_state.klienta_rekviziti
+                    if _detect_uznemums(question):
+                        rek_konteksts = "\n\n" + _rekvizitu_konteksts(rek)
 
-                    # RAG meklēšana
-                    ir_jautajums = _ir_dokumentu_jautajums(question, st.session_state.messages)
-                    if ir_jautajums:
-                        context, sources = retrieve_context(collection, question)
-                    else:
-                        context, sources = "", []
+                ir_jautajums = _ir_dokumentu_jautajums(question, st.session_state.messages)
+                if ir_jautajums:
+                    context, sources = retrieve_context(collection, question)
+                else:
+                    context, sources = "", []
 
-                    pilns_konteksts = (context or "") + rek_konteksts
+                pilns_konteksts = (context or "") + rek_konteksts
 
-                    if not pilns_konteksts and ir_jautajums:
-                        answer_raw = "Šī informācija nav pieejama dokumentācijā."
-                    else:
-                        answer_raw = ask_ai(
-                            question, pilns_konteksts,
-                            st.session_state.selected_model,
-                            st.session_state.messages,
-                            izmanto_rag=ir_jautajums or bool(rek_konteksts),
-                        )
-
-                answer, markers = parse_markers(answer_raw)
-
-                st.markdown(answer)
-                tables = extract_markdown_tables(answer)
-                if tables:
-                    excel_bytes = tables_to_excel_bytes(tables)
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    st.download_button(
-                        label="📥 Lejupielādēt kā Excel",
-                        data=excel_bytes,
-                        file_name=f"horizon_aprekins_{timestamp}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                if not pilns_konteksts and ir_jautajums:
+                    answer_raw = "Šī informācija nav pieejama dokumentācijā."
+                else:
+                    answer_raw = ask_ai(
+                        question, pilns_konteksts,
+                        st.session_state.selected_model,
+                        st.session_state.messages,
+                        izmanto_rag=ir_jautajums or bool(rek_konteksts),
                     )
-                new_msg_idx = len(st.session_state.messages)
-                render_marker_buttons(markers, key_prefix=f"msg_{new_msg_idx}")
-                if sources:
-                    with st.expander("📎 Avoti"):
-                        for src in sources:
-                            st.text(f"• {src}")
+
+            answer, markers = parse_markers(answer_raw)
+
+            st.markdown(answer)
+            tables = extract_markdown_tables(answer)
+            if tables:
+                excel_bytes = tables_to_excel_bytes(tables)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                st.download_button(
+                    label="📥 Lejupielādēt kā Excel",
+                    data=excel_bytes,
+                    file_name=f"horizon_aprekins_{timestamp}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            new_msg_idx = len(st.session_state.messages)
+            render_marker_buttons(markers, key_prefix=f"msg_{new_msg_idx}")
+            if sources:
+                with st.expander("📎 Avoti"):
+                    for src in sources:
+                        st.text(f"• {src}")
 
         st.session_state.messages.append({
             "role":      "assistant",
@@ -1464,7 +1450,6 @@ def main():
             "sources":   sources,
             "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
         })
-        st.session_state.input_counter += 1
 
     # Modeļa noklusējums
     if "selected_model" not in st.session_state:
