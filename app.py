@@ -1293,21 +1293,34 @@ def main():
                     for src in msg["sources"]:
                         st.text(f"• {src}")
 
-    # ── Balss ievade ─────────────────────────────────────────────────────────
-    audio = st.audio_input("🎙️ Ierunā jautājumu", key="audio_rec",
-                           label_visibility="collapsed")
-    if audio:
-        audio_bytes = audio.read()
-        audio_hash  = hash(audio_bytes)
-        if audio_hash != st.session_state.get("last_audio_hash"):
-            st.session_state.last_audio_hash = audio_hash
-            with st.spinner("Atpazīstu runu..."):
-                voice_text = transcribe_audio(audio_bytes)
-            if voice_text:
-                st.session_state.voice_input = voice_text
-                st.rerun()
+    # ── Balss + teksta ievade ─────────────────────────────────────────────────
+    # CSS — mic poga izskatās kā daļa no ievades joslas
+    st.markdown("""
+    <style>
+    div[data-testid="stColumn"]:has(button.mic-btn) {
+        display: flex; align-items: flex-end; padding-bottom: 6px;
+    }
+    div.stAudio > button { border-radius: 50% !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
-    # ── Jautājuma ievade ──────────────────────────────────────────────────────
+    from streamlit_mic_recorder import mic_recorder
+    col_mic, col_spacer = st.columns([1, 11])
+    with col_mic:
+        audio_data = mic_recorder(
+            start_prompt="🎙️",
+            stop_prompt="⏹️",
+            just_once=True,
+            use_container_width=True,
+            key="mic_recorder",
+        )
+    if audio_data:
+        with st.spinner("Atpazīstu runu..."):
+            voice_text = transcribe_audio(audio_data["bytes"])
+        if voice_text:
+            st.session_state.voice_input = voice_text
+            st.rerun()
+
     _typed   = st.chat_input("Raksti vai ierunā jautājumu...")
     question = st.session_state.pop("voice_input", None) or _typed
     if question:
