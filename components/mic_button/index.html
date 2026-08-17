@@ -109,9 +109,9 @@ setInterval(fix, 1500);
 window.parent.addEventListener('resize', fix);
 
 /* ── Klusuma detektors ────────────────────────────────────────────────────── */
-var SPEECH_THRESHOLD  = 0.04;  // RMS — virs šī = runa konstatēta
-var SILENCE_THRESHOLD = 0.02;  // RMS — zem šī pēc runas = klusums
 var SILENCE_DELAY_MS  = 1500;  // ms klusuma pirms apstājas
+var CALIB_MS          = 600;   // ms fona trokšņa kalibrēšanai
+// speechThreshold un silenceThreshold tiek aprēķināti dinamiskistart
 
 var btn         = document.getElementById('btn');
 var mediaRecorder = null, chunks = [], recording = false;
@@ -153,27 +153,49 @@ function startRec() {
 
         var buf = new Uint8Array(analyser.fftSize);
         silenceStart = null;
-        var speechDetected = false;  // klusuma taimeris sākas tikai pēc runas
+        var speechDetected  = false;
+        var speechThresh    = 0.05;   // tiks pārrakstīts pēc kalibrēšanas
+        var silenceThresh   = 0.025;
 
-        function checkSilence() {
-            if (!recording) return;
+        function getRms() {
             analyser.getByteTimeDomainData(buf);
-
-            /* RMS amplitūda */
             var sum = 0;
             for (var i = 0; i < buf.length; i++) {
                 var v = (buf[i] - 128) / 128;
                 sum += v * v;
             }
-            var rms = Math.sqrt(sum / buf.length);
+            return Math.sqrt(sum / buf.length);
+        }
 
-            if (rms >= SPEECH_THRESHOLD) {
-                /* Aktīva runa */
+        /* Kalibrē fona troksni CALIB_MS ms, tad sāk detektoru */
+        var calibSamples = [], calibStart = Date.now();
+        btn.style.opacity = '0.5';
+        btn.title = 'Kalibrē...';
+
+        function calibrate() {
+            if (!recording) return;
+            calibSamples.push(getRms());
+            if (Date.now() - calibStart < CALIB_MS) {
+                rafId = requestAnimationFrame(calibrate);
+            } else {
+                var noise = calibSamples.reduce(function(a,b){return a+b;},0) / calibSamples.length;
+                speechThresh  = Math.max(noise * 4,   0.02);
+                silenceThresh = Math.max(noise * 1.8,  0.01);
+                btn.style.opacity = '1';
+                btn.title = 'Runā... (klikšķis aptur)';
+                rafId = requestAnimationFrame(checkSilence);
+            }
+        }
+
+        function checkSilence() {
+            if (!recording) return;
+            var rms = getRms();
+
+            if (rms >= speechThresh) {
                 speechDetected = true;
                 silenceStart   = null;
                 btn.style.opacity = '1';
-            } else if (speechDetected && rms < SILENCE_THRESHOLD) {
-                /* Klusums — bet tikai ja runa jau bijusi */
+            } else if (speechDetected && rms < silenceThresh) {
                 if (!silenceStart) silenceStart = Date.now();
                 var elapsed = Date.now() - silenceStart;
                 btn.style.opacity = Math.max(0.35, 1 - elapsed / SILENCE_DELAY_MS);
@@ -182,7 +204,6 @@ function startRec() {
                     return;
                 }
             } else {
-                /* Starpstāvoklis (fona troksnis) — atiestata tikai klusuma taimeri */
                 if (speechDetected) silenceStart = null;
                 btn.style.opacity = '1';
             }
@@ -190,7 +211,7 @@ function startRec() {
             rafId = requestAnimationFrame(checkSilence);
         }
 
-        checkSilence();
+        calibrate();
 
         recording = true;
         btn.textContent = '🎙️';
