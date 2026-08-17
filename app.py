@@ -179,6 +179,28 @@ def load_gemini_client():
     )
 
 
+# ── Balss transkripcija ───────────────────────────────────────────────────────
+
+def transcribe_audio(audio_bytes: bytes) -> str | None:
+    """Transkribē audio ar Groq Whisper large-v3 (latviešu valoda)."""
+    try:
+        from groq import Groq
+        api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
+        if not api_key:
+            st.warning("⚠️ GROQ_API_KEY nav iestatīts — balss ievade nav pieejama.")
+            return None
+        client = Groq(api_key=api_key)
+        transcription = client.audio.transcriptions.create(
+            file=("audio.wav", audio_bytes, "audio/wav"),
+            model="whisper-large-v3",
+            language="lv",
+        )
+        return transcription.text.strip()
+    except Exception as e:
+        st.error(f"❌ Balss atpazīšanas kļūda: {e}")
+        return None
+
+
 # ── RAG ───────────────────────────────────────────────────────────────────────
 
 def retrieve_context(collection, question: str) -> tuple[str, list[str]]:
@@ -1271,8 +1293,21 @@ def main():
                     for src in msg["sources"]:
                         st.text(f"• {src}")
 
+    # ── Balss ievade ─────────────────────────────────────────────────────────
+    audio = st.audio_input("🎙️ Ierunā jautājumu", key="audio_rec")
+    if audio and not st.session_state.get("audio_processed"):
+        with st.spinner("Atpazīstu runu..."):
+            voice_text = transcribe_audio(audio.read())
+        if voice_text:
+            st.session_state.voice_input = voice_text
+        st.session_state.audio_processed = True
+        st.rerun()
+
     # ── Jautājuma ievade ──────────────────────────────────────────────────────
-    if question := st.chat_input("Uzraksti jautājumu..."):
+    _typed    = st.chat_input("Raksti vai ierunā jautājumu...")
+    question  = st.session_state.pop("voice_input", None) or _typed
+    if question:
+        st.session_state.audio_processed = False
         st.session_state.messages.append({"role": "user", "content": question})
         with st.chat_message("user"):
             st.markdown(question)
