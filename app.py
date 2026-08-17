@@ -1319,43 +1319,68 @@ def main():
                         st.text(f"• {src}")
 
     # ── Čata ievade ar integrētu mic pogu (fiksēta apakšā) ───────────────────
+
+    # JS: meklē iframe pēc title un piepieto fiksētu konteineru lapas apakšā.
+    # Izmantojam MutationObserver, lai tas izturētu Streamlit pārrenderēšanu.
     st.markdown("""
 <style>
-/* Fiksē ievades komponenta konteineru pie lapas apakšas */
-.stCustomComponentV1:has(iframe[title="chat_input_mic"]) {
+#_chat_fixed_bar {
     position: fixed !important;
     bottom: 0 !important;
-    left: 0 !important;
     right: 0 !important;
-    z-index: 999 !important;
+    z-index: 1000 !important;
     background: white !important;
     padding: 10px 24px 14px !important;
     border-top: 1px solid #e9e9e9 !important;
     box-shadow: 0 -2px 8px rgba(0,0,0,.07) !important;
 }
-/* Vieta apakšā, lai čata vēsture nesegtos aiz ievades */
-.block-container {
-    padding-bottom: 90px !important;
-}
+.block-container { padding-bottom: 90px !important; }
 </style>
 <script>
 (function () {
-    function adjustLeft() {
-        var bar = document.querySelector('.stCustomComponentV1:has(iframe[title="chat_input_mic"])');
-        if (!bar) return;
-        var sb = document.querySelector('[data-testid="stSidebar"]');
-        var sbW = sb ? sb.getBoundingClientRect().width : 0;
-        bar.style.left = sbW + 'px';
+    /* Izveido fiksētu div vienu reizi */
+    var bar = document.getElementById('_chat_fixed_bar');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = '_chat_fixed_bar';
+        document.body.appendChild(bar);
     }
-    adjustLeft();
-    new MutationObserver(adjustLeft).observe(document.body, {childList: true, subtree: true});
-    window.addEventListener('resize', adjustLeft);
+
+    function moveIframe() {
+        var iframe = document.querySelector('iframe[title="chat_input_mic"]');
+        if (!iframe || bar.contains(iframe)) return;
+
+        /* Slēpj oriģinālo konteineru, lai neaizņem vietu */
+        var orig = iframe.closest('[data-testid="stElementContainer"]')
+                   || iframe.parentElement;
+        if (orig) { orig.style.height = '0'; orig.style.overflow = 'hidden'; }
+
+        bar.appendChild(iframe);
+        iframe.style.display = 'block';
+        iframe.style.width   = '100%';
+
+        /* Pielāgo platumu pēc sānjoslas */
+        var sb = document.querySelector('[data-testid="stSidebar"]');
+        bar.style.left = (sb ? sb.getBoundingClientRect().width : 0) + 'px';
+    }
+
+    moveIframe();
+    new MutationObserver(moveIframe).observe(document.body,
+        { childList: true, subtree: true });
+    window.addEventListener('resize', function () {
+        var sb = document.querySelector('[data-testid="stSidebar"]');
+        bar.style.left = (sb ? sb.getBoundingClientRect().width : 0) + 'px';
+    });
 })();
 </script>
 """, unsafe_allow_html=True)
 
     if "input_counter" not in st.session_state:
         st.session_state.input_counter = 0
+
+    # Konteiners jaunajiem ziņojumiem — DOM plūsmā PIRMS komponenta,
+    # tāpēc jauna atbilde nerenderējas zem ievades lauka.
+    new_msg_container = st.container()
 
     result = chat_input_mic(reset_counter=st.session_state.input_counter)
     question = None
@@ -1370,70 +1395,67 @@ def main():
                 question = transcribe_audio(audio_bytes, result.get("mimeType", "audio/webm"))
 
     if question:
-        st.session_state.messages.append({"role": "user", "content": question})
-        with st.chat_message("user"):
-            st.markdown(question)
+        with new_msg_container:
+            st.session_state.messages.append({"role": "user", "content": question})
+            with st.chat_message("user"):
+                st.markdown(question)
 
-        with st.chat_message("assistant"):
-            with st.spinner("Prātoju ..."):
+            with st.chat_message("assistant"):
+                with st.spinner("Prātoju ..."):
 
-                # Automātiska rekvizītu iegūšana — ja nav jau iegūti
-                if not st.session_state.get("klienta_rekviziti"):
-                    vaicajums = _detect_uznemums(question)
-                    if vaicajums:
-                        rek = fetch_firmas_lv(vaicajums)
-                        if "kļūda" not in rek:
-                            st.session_state.klienta_rekviziti = rek
+                    # Automātiska rekvizītu iegūšana — ja nav jau iegūti
+                    if not st.session_state.get("klienta_rekviziti"):
+                        vaicajums = _detect_uznemums(question)
+                        if vaicajums:
+                            rek = fetch_firmas_lv(vaicajums)
+                            if "kļūda" not in rek:
+                                st.session_state.klienta_rekviziti = rek
 
-                # Ja rekvizīti tikko iegūti — pievieno kontekstu AI ziņojumam
-                rek_konteksts = ""
-                if st.session_state.get("klienta_rekviziti"):
-                    rek = st.session_state.klienta_rekviziti
-                    # Pievieno tikai ja klients šajā ziņojumā pieminēja uzņēmumu
-                    if _detect_uznemums(question):
-                        rek_konteksts = "\n\n" + _rekvizitu_konteksts(rek)
+                    # Ja rekvizīti tikko iegūti — pievieno kontekstu AI ziņojumam
+                    rek_konteksts = ""
+                    if st.session_state.get("klienta_rekviziti"):
+                        rek = st.session_state.klienta_rekviziti
+                        if _detect_uznemums(question):
+                            rek_konteksts = "\n\n" + _rekvizitu_konteksts(rek)
 
-                # RAG meklēšana
-                ir_jautajums = _ir_dokumentu_jautajums(question, st.session_state.messages)
-                if ir_jautajums:
-                    context, sources = retrieve_context(collection, question)
-                else:
-                    context, sources = "", []
+                    # RAG meklēšana
+                    ir_jautajums = _ir_dokumentu_jautajums(question, st.session_state.messages)
+                    if ir_jautajums:
+                        context, sources = retrieve_context(collection, question)
+                    else:
+                        context, sources = "", []
 
-                # Apvieno RAG kontekstu ar rekvizītu kontekstu
-                pilns_konteksts = (context or "") + rek_konteksts
+                    pilns_konteksts = (context or "") + rek_konteksts
 
-                if not pilns_konteksts and ir_jautajums:
-                    answer_raw = "Šī informācija nav pieejama dokumentācijā."
-                else:
-                    answer_raw = ask_ai(
-                        question, pilns_konteksts,
-                        st.session_state.selected_model,
-                        st.session_state.messages,
-                        izmanto_rag=ir_jautajums or bool(rek_konteksts),
+                    if not pilns_konteksts and ir_jautajums:
+                        answer_raw = "Šī informācija nav pieejama dokumentācijā."
+                    else:
+                        answer_raw = ask_ai(
+                            question, pilns_konteksts,
+                            st.session_state.selected_model,
+                            st.session_state.messages,
+                            izmanto_rag=ir_jautajums or bool(rek_konteksts),
+                        )
+
+                answer, markers = parse_markers(answer_raw)
+
+                st.markdown(answer)
+                tables = extract_markdown_tables(answer)
+                if tables:
+                    excel_bytes = tables_to_excel_bytes(tables)
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    st.download_button(
+                        label="📥 Lejupielādēt kā Excel",
+                        data=excel_bytes,
+                        file_name=f"horizon_aprekins_{timestamp}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     )
-
-            # Izvelk marķierus no atbildes
-            answer, markers = parse_markers(answer_raw)
-
-            st.markdown(answer)
-            tables = extract_markdown_tables(answer)
-            if tables:
-                excel_bytes = tables_to_excel_bytes(tables)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                st.download_button(
-                    label="📥 Lejupielādēt kā Excel",
-                    data=excel_bytes,
-                    file_name=f"horizon_aprekins_{timestamp}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                )
-            # Key prefix atbilst nākamajam indeksam vēstures ciklā
-            new_msg_idx = len(st.session_state.messages)
-            render_marker_buttons(markers, key_prefix=f"msg_{new_msg_idx}")
-            if sources:
-                with st.expander("📎 Avoti"):
-                    for src in sources:
-                        st.text(f"• {src}")
+                new_msg_idx = len(st.session_state.messages)
+                render_marker_buttons(markers, key_prefix=f"msg_{new_msg_idx}")
+                if sources:
+                    with st.expander("📎 Avoti"):
+                        for src in sources:
+                            st.text(f"• {src}")
 
         st.session_state.messages.append({
             "role":      "assistant",
@@ -1442,7 +1464,6 @@ def main():
             "sources":   sources,
             "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
         })
-        # Atiestata ievades lauku (palielina skaitītāju → komponents notīrās)
         st.session_state.input_counter += 1
 
     # Modeļa noklusējums
