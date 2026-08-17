@@ -527,134 +527,71 @@ def send_chat_by_email(messages: list, user_email: str = "") -> tuple[bool, str]
         return False, f"❌ Sūtīšanas kļūda: {e}"
 
 
-# ── Firmas.lv rekvizītu iegūšana ─────────────────────────────────────────────
+# ── Uzņēmumu reģistrs caur data.gov.lv API ───────────────────────────────────
 
-def fetch_firmas_lv(vaicajums: str) -> dict:
-    """Iegūst uzņēmuma rekvizītus no firmas.lv pēc reģ. numura, nosaukuma vai PVN numura."""
+_UR_RESOURCE_ID = "25e80bf3-f107-4ab4-89ef-251b5b9374e9"
+_UR_API_URL     = "https://data.gov.lv/api/3/action/datastore_search"
+
+def fetch_data_gov_lv(vaicajums: str) -> dict:
+    """Iegūst uzņēmuma rekvizītus no LR Uzņēmumu reģistra caur data.gov.lv API.
+
+    Pieejamie lauki: nosaukums, reģ. numurs, juridiskā adrese, uzņēmuma tips,
+    reģistrācijas datums, SEPA identifikators.
+    """
     import requests as req
-    from bs4 import BeautifulSoup
-    from urllib.parse import quote
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                      "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "lv,en;q=0.9",
-    }
+    import json as _json
 
     vaicajums = vaicajums.strip()
-    # PVN numurus normalizē: "LV40003734170" → "40003734170" (firmas.lv meklē bez "LV")
-    meklet = vaicajums.upper().removeprefix("LV") if vaicajums.upper().startswith("LV") and vaicajums[2:].isdigit() else vaicajums
 
-    # 1. Meklēšana pēc jebkura kritērija
-    search_url = f"https://www.firmas.lv/lv/uznemumi/meklet?q={quote(meklet)}"
+    # PVN numuru normalizē → 11 cipari
+    if re.match(r'^LV\d{11}$', vaicajums, re.IGNORECASE):
+        vaicajums = vaicajums[2:]
+
+    is_regnum = bool(re.match(r'^\d{11}$', vaicajums))
+
+    if is_regnum:
+        params = {
+            "resource_id": _UR_RESOURCE_ID,
+            "filters":     _json.dumps({"regcode": int(vaicajums)}),
+            "limit":       1,
+        }
+    else:
+        params = {
+            "resource_id": _UR_RESOURCE_ID,
+            "q":           vaicajums,
+            "limit":       15,
+        }
+
     try:
-        r = req.get(search_url, headers=headers, timeout=10)
+        r = req.get(_UR_API_URL, params=params, timeout=10)
         r.raise_for_status()
+        data = r.json()
     except Exception as e:
-        return {"kļūda": f"Nevar piekļūt firmas.lv: {e}"}
+        return {"kļūda": f"data.gov.lv nav pieejams: {e}"}
 
-    soup = BeautifulSoup(r.text, "html.parser")
+    if not data.get("success"):
+        return {"kļūda": "data.gov.lv API kļūda"}
 
-    # Atrod pirmo uzņēmuma saiti rezultātu sarakstā
-    # (izslēdz pakalpojumu lapas, meklēšanas un nav uznemumi sadaļa)
-    IZSLEGT = {"/meklet", "/pakalpojumi", "/par-mums", "/lv/tops",
-               "/lv/personas", "/lv/adreses", "/industrijas"}
-    company_url = None
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
-        if "/uznemumi/" not in href:
-            continue
-        if any(x in href for x in IZSLEGT):
-            continue
-        # Pārliecinās, ka saite beidzas ar skaitli (reģ. numurs)
-        segmenti = href.rstrip("/").split("/")
-        if segmenti and segmenti[-1].isdigit():
-            company_url = "https://www.firmas.lv" + href if href.startswith("/") else href
-            break
+    records = data.get("result", {}).get("records", [])
+    if not records:
+        return {"kļūda": f"Uzņēmums '{vaicajums}' nav atrasts Uzņēmumu reģistrā"}
 
-    if not company_url:
-        return {"kļūda": f"Uzņēmums '{vaicajums}' nav atrasts firmas.lv"}
+    # Priekšroka aktīvajiem uzņēmumiem (terminated IS NULL)
+    active = [rec for rec in records if not rec.get("terminated")]
+    rec = active[0] if active else records[0]
 
-    # 2. Iegūst uzņēmuma lapu
-    try:
-        r2 = req.get(company_url, headers=headers, timeout=10)
-        r2.raise_for_status()
-    except Exception as e:
-        return {"kļūda": f"Nevar ielādēt uzņēmuma lapu: {e}"}
+    regcode_str = str(int(rec["regcode"])) if rec.get("regcode") else ""
 
-    soup2 = BeautifulSoup(r2.text, "html.parser")
-
-    # Reģ. numuru izvelk no URL (pēdējais segments)
-    url_reg = company_url.rstrip("/").split("/")[-1]
-
-    rekviziti = {
-        "nosaukums":        "",
-        "reg_numurs":       url_reg,
-        "juridiska_adrese": "",
-        "pvn_numurs":       "",
-        "talrunis":         "",
-        "epasts":           "",
-        "majas_lapa":       "",
-        "url":              company_url,
+    return {
+        "nosaukums":        rec.get("name", ""),
+        "reg_numurs":       regcode_str,
+        "juridiska_adrese": rec.get("address", ""),
+        "tips":             rec.get("type_text", ""),
+        "registrēts":       (rec.get("registered") or "")[:10],
+        "sepa":             rec.get("sepa") or "",
+        "pvn_numurs":       "",  # nav pieejams UR datos
+        "url":              f"https://ur.gov.lv/lv/meklesana/?term={regcode_str}",
     }
-
-    # Nosaukums no h1
-    h1 = soup2.find("h1")
-    if h1:
-        rekviziti["nosaukums"] = h1.get_text(strip=True)
-
-    # Parsē "Pamatdati" tabulu — katras rindas pirmā šūna = etiķete, otrā = vērtība
-    # Firmas.lv izmanto <th> etiķetēm un <td> vērtībām
-    for table in soup2.find_all("table"):
-        for tr in table.find_all("tr"):
-            cells = tr.find_all(["th", "td"])
-            if len(cells) < 2:
-                continue
-            label = cells[0].get_text(strip=True).lower()
-            value = cells[1].get_text(strip=True, separator=" ")
-
-            if "pvn numurs" in label or "pvn reģ" in label:
-                # Izvelk tikai "LVxxxxxxxxxx" daļu
-                import re as _re
-                pvn_match = _re.search(r'LV\d+', value)
-                if pvn_match:
-                    rekviziti["pvn_numurs"] = pvn_match.group(0)
-
-            elif "juridiskā adrese" in label or "juridiska adrese" in label:
-                # Adrese ir pirmajā <a> tagā šūnā
-                adrese_a = cells[1].find("a")
-                if adrese_a:
-                    rekviziti["juridiska_adrese"] = adrese_a.get_text(strip=True)
-                else:
-                    rekviziti["juridiska_adrese"] = cells[1].get_text(strip=True, separator=" ")
-
-            elif "reģistrācijas numurs" in label:
-                # "40003734170, 18.03.2005" → paņem tikai numuru
-                reg_val = value.split(",")[0].strip()
-                if reg_val.isdigit():
-                    rekviziti["reg_numurs"] = reg_val
-
-            elif "reģistrēts nosaukums" in label:
-                if not rekviziti["nosaukums"]:
-                    rekviziti["nosaukums"] = value
-
-    # Kontakti no "Kontakti" sadaļas
-    for a in soup2.find_all("a", href=True):
-        href = a["href"]
-        if href.startswith("tel:") and not rekviziti["talrunis"]:
-            rekviziti["talrunis"] = href.replace("tel:", "").strip()
-        elif href.startswith("mailto:") and not rekviziti["epasts"]:
-            rekviziti["epasts"] = href.replace("mailto:", "").strip()
-        elif (href.startswith("http") and
-              "firmas.lv" not in href and
-              "vid.gov" not in href and
-              "ec.europa" not in href and
-              not rekviziti["majas_lapa"]):
-            teksts_a = a.get_text(strip=True)
-            if teksts_a.startswith("http") or "www." in teksts_a:
-                rekviziti["majas_lapa"] = teksts_a
-
-    return rekviziti
 
 
 # ── Līguma sagatavošana ───────────────────────────────────────────────────────
@@ -1088,16 +1025,23 @@ def _ir_dokumentu_jautajums(teksts: str, history: list) -> bool:
 
 # ── Automātiska rekvizītu iegūšana ───────────────────────────────────────────
 
+_DETECT_IGNORET = {
+    "Latvija", "Latvijā", "Latvijas", "Rīga", "Rīgā", "Rīgas",
+    "Liepāja", "Liepājā", "Jelgava", "Jelgavā", "Jūrmala", "Jūrmalā",
+    "Valmiera", "Daugavpils", "Jēkabpils", "Jūrmala", "Ventspils",
+    "Eiropa", "Eiropā", "Eiropas", "Pasaule", "Pasaulē",
+    "Paldies", "Lūdzu", "Jaunā", "Vecā", "Lielā", "Mazā",
+}
+
 def _detect_uznemums(teksts: str) -> str | None:
-    """Mēģina atpazīt reģistrācijas numuru vai uzņēmuma nosaukumu tekstā.
-    Atgriež meklēšanas virkni firmas.lv vai None.
-    """
-    # Reģistrācijas numurs — 11 cipari
+    """Mēģina atpazīt reģistrācijas numuru vai uzņēmuma nosaukumu tekstā."""
+
+    # 1. Reģistrācijas numurs — 11 cipari
     reg_match = re.search(r'\b\d{11}\b', teksts)
     if reg_match:
         return reg_match.group(0)
 
-    # Uzņēmuma forma + nosaukums (SIA "X", AS X, IK X u.tml.)
+    # 2. Uzņēmuma forma + nosaukums (SIA "X", AS X, IK X u.tml.)
     uzn_match = re.search(
         r'\b(SIA|AS|IK|ZS|BO|VSIA|VAS|PSIA|kooperatīvs?)\s+["\']?[\wĀāČčĒēĢģĪīĶķĻļŅņŠšŪūŽž][\wĀāČčĒēĢģĪīĶķĻļŅņŠšŪūŽž\s"\']{2,40}',
         teksts, re.IGNORECASE
@@ -1105,20 +1049,37 @@ def _detect_uznemums(teksts: str) -> str | None:
     if uzn_match:
         return uzn_match.group(0).strip().strip('"\'')
 
+    # 3. Nosaukums pēdiņās (bez juridiskās formas)
+    pedinju_match = re.search(r'["“„]([^"”“\n]{3,50})["”"]', teksts)
+    if pedinju_match:
+        return pedinju_match.group(1)
+
+    # 4. 2–4 lielie vārdi pēc kārtas (nosaukums bez juridiskās formas)
+    # Piemērs: "Latvijas Gāze", "Elme Messer", "Rimi Baltic"
+    LV_UPPER = "A-ZĀČĒĢĪĶĻŅŠŪŽ"
+    LV_LOWER = "a-zāčēģīķļņšūž"
+    caps_matches = re.findall(
+        rf'\b[{LV_UPPER}][{LV_LOWER}]{{2,}}(?:\s+[{LV_UPPER}][{LV_LOWER}]{{1,}}{{1,3}})\b',
+        teksts
+    )
+    for candidate in caps_matches:
+        words = candidate.split()
+        if len(words) >= 2 and not any(w in _DETECT_IGNORET for w in words):
+            return candidate
+
     return None
 
 
 def _rekvizitu_konteksts(rek: dict) -> str:
     """Formatē iegūtos rekvizītus kā konteksta tekstu AI ziņojumam."""
-    rindas = ["[Automātiski iegūti rekvizīti no firmas.lv — apstipriniet pie klienta]"]
+    rindas = ["[Automātiski iegūti rekvizīti no LR Uzņēmumu reģistra — apstipriniet pie klienta]"]
     lauki = [
         ("Nosaukums",        rek.get("nosaukums", "")),
+        ("Uzņēmuma tips",    rek.get("tips", "")),
         ("Reģ. nr.",         rek.get("reg_numurs", "")),
-        ("PVN nr.",          rek.get("pvn_numurs", "")),
         ("Juridiskā adrese", rek.get("juridiska_adrese", "")),
-        ("Tālrunis",         rek.get("talrunis", "")),
-        ("E-pasts",          rek.get("epasts", "")),
-        ("Mājas lapa",       rek.get("majas_lapa", "")),
+        ("Reģistrēts",       rek.get("registrēts", "")),
+        ("PVN nr.",          rek.get("pvn_numurs", "")),
     ]
     for label, val in lauki:
         if val:
@@ -1348,7 +1309,7 @@ def main():
                 if not st.session_state.get("klienta_rekviziti"):
                     vaicajums = _detect_uznemums(question)
                     if vaicajums:
-                        rek = fetch_firmas_lv(vaicajums)
+                        rek = fetch_data_gov_lv(vaicajums)
                         if "kļūda" not in rek:
                             st.session_state.klienta_rekviziti = rek
 
@@ -1439,7 +1400,7 @@ def main():
                 st.warning("⚠️ Ievadi reģistrācijas numuru, nosaukumu vai PVN numuru.")
             else:
                 with st.spinner("Meklē firmas.lv..."):
-                    rek = fetch_firmas_lv(reg_input.strip())
+                    rek = fetch_data_gov_lv(reg_input.strip())
                 if "kļūda" in rek:
                     st.error(rek["kļūda"])
                 else:
@@ -1450,17 +1411,17 @@ def main():
             with st.expander("📋 Rekvizīti", expanded=True):
                 for atslega, nosaukums in [
                     ("nosaukums",        "Nosaukums"),
+                    ("tips",             "Tips"),
                     ("reg_numurs",       "Reģ. nr."),
                     ("juridiska_adrese", "Juridiskā adrese"),
+                    ("registrēts",       "Reģistrēts"),
                     ("pvn_numurs",       "PVN nr."),
-                    ("talrunis",         "Tālrunis"),
-                    ("epasts",           "E-pasts"),
-                    ("majas_lapa",       "Mājas lapa"),
+                    ("sepa",             "SEPA"),
                 ]:
                     val = rek.get(atslega, "")
                     if val:
                         st.caption(f"**{nosaukums}:** {val}")
-                st.markdown(f"[🔗 firmas.lv]({rek.get('url', '')})")
+                st.markdown(f"[🔗 UR.gov.lv]({rek.get('url', '')})")
 
         st.divider()
 
