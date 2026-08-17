@@ -1293,27 +1293,59 @@ def main():
                     for src in msg["sources"]:
                         st.text(f"• {src}")
 
-    # ── Balss + teksta ievade ─────────────────────────────────────────────────
-    # CSS — mic poga izskatās kā daļa no ievades joslas
+    # ── Ievades josla: mic poga + teksts + sūtīt ─────────────────────────────
     st.markdown("""
     <style>
-    div[data-testid="stColumn"]:has(button.mic-btn) {
-        display: flex; align-items: flex-end; padding-bottom: 6px;
+    /* Sticky ievades josla apakšā */
+    div[data-testid="stBottom"] { display: none; }
+    .ievades-josla {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        background: var(--background-color);
+        border-top: 1px solid rgba(49,51,63,0.15);
+        padding: 10px 16px 12px 16px;
+        z-index: 999;
     }
-    div.stAudio > button { border-radius: 50% !important; }
+    .ievades-josla [data-testid="stHorizontalBlock"] { gap: 6px; align-items: center; }
+    .ievades-josla [data-testid="stForm"] { border: none !important; padding: 0 !important; }
+    .ievades-josla input[type="text"] {
+        border-radius: 20px !important;
+        padding: 8px 14px !important;
+    }
+    /* Mic poga — apaļa */
+    .ievades-josla iframe { border-radius: 50%; }
+    /* Atstarpe apakšā lai pēdējais ziņojums neredzams */
+    section[data-testid="stMain"] > div { padding-bottom: 80px; }
     </style>
     """, unsafe_allow_html=True)
 
     from streamlit_mic_recorder import mic_recorder
-    col_mic, col_spacer = st.columns([1, 11])
-    with col_mic:
-        audio_data = mic_recorder(
-            start_prompt="🎙️",
-            stop_prompt="⏹️",
-            just_once=True,
-            use_container_width=True,
-            key="mic_recorder",
-        )
+
+    with st.container(key="ievades-josla"):
+        st.markdown('<div class="ievades-josla">', unsafe_allow_html=True)
+        col_mic, col_form = st.columns([1, 11])
+
+        with col_mic:
+            audio_data = mic_recorder(
+                start_prompt="🎙️",
+                stop_prompt="⏹️",
+                just_once=True,
+                use_container_width=True,
+                key="mic_recorder",
+            )
+
+        with col_form:
+            with st.form("chat_form", clear_on_submit=True, border=False):
+                col_text, col_send = st.columns([10, 1])
+                with col_text:
+                    typed = st.text_input(
+                        "", placeholder="Raksti vai ierunā jautājumu...",
+                        label_visibility="collapsed",
+                    )
+                with col_send:
+                    submitted = st.form_submit_button("▶", use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
     if audio_data:
         with st.spinner("Atpazīstu runu..."):
             voice_text = transcribe_audio(audio_data["bytes"])
@@ -1321,8 +1353,7 @@ def main():
             st.session_state.voice_input = voice_text
             st.rerun()
 
-    _typed   = st.chat_input("Raksti vai ierunā jautājumu...")
-    question = st.session_state.pop("voice_input", None) or _typed
+    question = st.session_state.pop("voice_input", None) or (typed if submitted else None)
     if question:
         st.session_state.messages.append({"role": "user", "content": question})
         with st.chat_message("user"):
