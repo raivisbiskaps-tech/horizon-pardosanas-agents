@@ -153,10 +153,7 @@ function startRec() {
 
         var buf = new Uint8Array(analyser.fftSize);
         silenceStart = null;
-        var speechDetected  = false;
-        var speechFrames    = 0;          // secīgu kadru skaitītājs virs sliekšņa
-        var SPEECH_FRAMES   = 6;          // cik secīgu kadru = runa
-        var speechThresh    = 0.05;       // pārrakstīs pēc kalibrēšanas
+        var speechThresh = 0.05;  // pārrakstīs pēc kalibrēšanas
 
         function getRms() {
             analyser.getByteTimeDomainData(buf);
@@ -180,10 +177,12 @@ function startRec() {
                 rafId = requestAnimationFrame(calibrate);
             } else {
                 var noise = calibSamples.reduce(function(a,b){return a+b;},0) / calibSamples.length;
-                /* Slieksnis: 5x fona troksnis, minimums 0.04 */
-                speechThresh = Math.max(noise * 5, 0.04);
+                /* Slieksnis: 6x fona troksnis, minimums 0.05 */
+                speechThresh = Math.max(noise * 6, 0.05);
                 btn.style.opacity = '1';
                 btn.title = 'Runā... (klikšķis aptur)';
+                /* Neliels grācijas periods pirms klusuma detektors sāk darbu */
+                silenceStart = Date.now();
                 rafId = requestAnimationFrame(checkSilence);
             }
         }
@@ -193,27 +192,17 @@ function startRec() {
             var rms = getRms();
 
             if (rms >= speechThresh) {
-                /* Iespējama runa — skaita secīgus kadrus */
-                speechFrames++;
-                if (speechFrames >= SPEECH_FRAMES) {
-                    speechDetected = true;
-                    silenceStart   = null;
-                    btn.style.opacity = '1';
-                }
+                /* Runa — atiestata klusuma taimeri */
+                silenceStart = Date.now();
+                btn.style.opacity = '1';
             } else {
-                /* Zem sliekšņa — atiestata kadru skaitītāju */
-                speechFrames = 0;
-                if (speechDetected) {
-                    /* Klusums pēc runas — palaiž taimeri */
-                    if (!silenceStart) silenceStart = Date.now();
-                    var elapsed = Date.now() - silenceStart;
-                    btn.style.opacity = Math.max(0.35, 1 - elapsed / SILENCE_DELAY_MS);
-                    if (elapsed >= SILENCE_DELAY_MS) {
-                        stopRec(true);
-                        return;
-                    }
+                /* Klusums — taimeris tek */
+                var elapsed = Date.now() - silenceStart;
+                btn.style.opacity = Math.max(0.35, 1 - elapsed / SILENCE_DELAY_MS);
+                if (elapsed >= SILENCE_DELAY_MS) {
+                    stopRec(true);
+                    return;
                 }
-                /* Ja runa vēl nav konstatēta — gaidām, nedara neko */
             }
 
             rafId = requestAnimationFrame(checkSilence);
