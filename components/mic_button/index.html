@@ -5,6 +5,7 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; }
+
 #btn {
     width: 100%; height: 100%;
     border: none; border-radius: 50%;
@@ -12,17 +13,45 @@ html, body { width: 100%; height: 100%; background: transparent; overflow: hidde
     cursor: pointer;
     font-size: 20px;
     display: flex; align-items: center; justify-content: center;
+    position: relative;
 }
 #btn:hover { background: rgba(0,0,0,.08); }
-#btn.rec { animation: pulse 1.2s ease-in-out infinite; }
-@keyframes pulse {
-    0%,100% { filter: drop-shadow(0 0 0px rgba(220,38,38,0)); }
-    50%      { filter: drop-shadow(0 0 7px rgba(220,38,38,.9)); }
+
+/* Pulsa animācija ierakstot */
+#btn.rec::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 2px solid rgba(220,38,38,.6);
+    animation: ring 1.2s ease-out infinite;
+}
+@keyframes ring {
+    0%   { transform: scale(1);   opacity: .8; }
+    100% { transform: scale(1.5); opacity: 0;  }
+}
+
+/* Klusuma indikators — tukšs aplis kas piepildās */
+#silence-ring {
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    display: none;
+}
+#silence-ring circle {
+    fill: none;
+    stroke: #ef4444;
+    stroke-width: 3;
+    stroke-linecap: round;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    transition: stroke-dashoffset .1s linear;
 }
 </style>
 </head>
 <body>
-<button id="btn" title="Ierunāt">🎙️</button>
+<button id="btn" title="Nospied un runā">🎙️</button>
+
 <script>
 "use strict";
 
@@ -38,22 +67,18 @@ window.addEventListener('message', function(ev) {
     if (!ev.data || ev.data.type !== 'streamlit:render') return;
     var c = (ev.data.args || {}).reset_counter;
     if (c == null) c = 0;
-    if (c !== _lastCounter) { _lastCounter = c; if (recording) stopRec(); }
+    if (c !== _lastCounter) { _lastCounter = c; if (recording) stopRec(false); }
 });
 
 post({ type: 'streamlit:setFrameHeight', height: 36 });
 post({ type: 'streamlit:componentReady', apiVersion: 1 });
 
-/* ── Pozicionēšana — BEZ iframe pārvietošanas ───────────────────────────── */
-/* Iframe paliek Streamlit DOM kokā (lai saglabātu saziņu).
-   Tā vietā parent div iegūst position:fixed.                               */
+/* ── Pozicionēšana ────────────────────────────────────────────────────────── */
 var SZ = 36;
 
 function fix() {
     try {
         var pd = window.parent.document;
-
-        /* Atrod šo iframe parent dokumentā */
         var me = null;
         var frames = pd.querySelectorAll('iframe');
         for (var i = 0; i < frames.length; i++) {
@@ -61,82 +86,134 @@ function fix() {
         }
         if (!me) return;
 
-        /* Tūlītējais vecāks — tas, kuram piešķiram fixed */
         var target = me.parentElement;
         if (!target || target === pd.body) return;
 
-        /* Atrod st.chat_input sūtīšanas pogu */
         var sendBtn = pd.querySelector('[data-testid="stBottom"] button');
         if (!sendBtn) return;
 
         var r = sendBtn.getBoundingClientRect();
         var W = window.parent;
-        var bottom = Math.round(W.innerHeight - r.top - r.height / 2 - SZ / 2);
-        var right  = Math.round(W.innerWidth  - r.left + 6);
-
-        /* Piešķir fixed vecākajam elementam */
         target.style.cssText =
             'position:fixed!important;' +
-            'bottom:'  + bottom + 'px!important;' +
-            'right:'   + right  + 'px!important;' +
-            'width:'   + SZ + 'px!important;' +
-            'height:'  + SZ + 'px!important;' +
-            'z-index:10001!important;' +
-            'margin:0!important;padding:0!important;overflow:visible!important;';
-
-        /* Iframe izmērs */
-        me.style.width  = SZ + 'px';
-        me.style.height = SZ + 'px';
-        me.style.border = 'none';
-
-    } catch(e) { /* cross-origin — ignorē */ }
+            'bottom:' + Math.round(W.innerHeight - r.top - r.height / 2 - SZ / 2) + 'px!important;' +
+            'right:'  + Math.round(W.innerWidth  - r.left + 6) + 'px!important;' +
+            'width:'  + SZ + 'px!important;height:' + SZ + 'px!important;' +
+            'z-index:10001!important;margin:0!important;padding:0!important;overflow:visible!important;';
+        me.style.cssText = 'width:' + SZ + 'px;height:' + SZ + 'px;border:none;';
+    } catch(e) {}
 }
 
-/* Izpilda tūlīt, pēc īsa kavējuma, un atkārtoti lai izturētu pārrenderēšanu */
-fix();
-setTimeout(fix, 300);
-setTimeout(fix, 800);
+fix(); setTimeout(fix, 300); setTimeout(fix, 800);
 setInterval(fix, 1500);
 window.parent.addEventListener('resize', fix);
 
-/* ── Mikrofons ────────────────────────────────────────────────────────────── */
-var btn = document.getElementById('btn');
+/* ── Klusuma detektors ────────────────────────────────────────────────────── */
+var SILENCE_THRESHOLD = 0.01;  // RMS amplitūda — zemāk = klusums
+var SILENCE_DELAY_MS  = 1500;  // ms klusuma pirms apstājas
+
+var btn         = document.getElementById('btn');
 var mediaRecorder = null, chunks = [], recording = false;
+var audioCtx    = null, analyser = null, rafId = null;
+var silenceStart = null;        // kad sākās klusums (null = runā)
+var silenceTimer = null;
 
 btn.addEventListener('click', function() {
-    if (recording) stopRec(); else startRec();
+    if (recording) stopRec(true); else startRec();
 });
 
 function startRec() {
     navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
         chunks = [];
+
+        /* MediaRecorder */
         var mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
                  : MediaRecorder.isTypeSupported('audio/webm')             ? 'audio/webm'
                  : 'audio/ogg';
         mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
         mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) chunks.push(e.data); };
         mediaRecorder.onstop = function() {
+            stream.getTracks().forEach(function(t) { t.stop(); });
             var blob = new Blob(chunks, { type: mime });
             var reader = new FileReader();
             reader.onloadend = function() {
                 setValue({ type: 'audio', data: reader.result.split(',')[1], mimeType: mime });
             };
             reader.readAsDataURL(blob);
-            stream.getTracks().forEach(function(t) { t.stop(); });
         };
         mediaRecorder.start();
+
+        /* Web Audio — klusuma detektors */
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        var src  = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        src.connect(analyser);
+
+        var buf = new Uint8Array(analyser.fftSize);
+        silenceStart = null;
+
+        function checkSilence() {
+            if (!recording) return;
+            analyser.getByteTimeDomainData(buf);
+
+            /* RMS amplitūda */
+            var sum = 0;
+            for (var i = 0; i < buf.length; i++) {
+                var v = (buf[i] - 128) / 128;
+                sum += v * v;
+            }
+            var rms = Math.sqrt(sum / buf.length);
+
+            if (rms < SILENCE_THRESHOLD) {
+                /* Klusums */
+                if (!silenceStart) silenceStart = Date.now();
+                var elapsed = Date.now() - silenceStart;
+
+                /* Atjaunina pulsa efektu — palēnina kad klusums */
+                btn.style.opacity = Math.max(0.4, 1 - elapsed / SILENCE_DELAY_MS / 1.5);
+
+                if (elapsed >= SILENCE_DELAY_MS) {
+                    stopRec(true);
+                    return;
+                }
+            } else {
+                /* Runa — atiestata klusuma taimeri */
+                silenceStart = null;
+                btn.style.opacity = '1';
+            }
+
+            rafId = requestAnimationFrame(checkSilence);
+        }
+
+        checkSilence();
+
         recording = true;
-        btn.textContent = '⏹️';
+        btn.textContent = '🎙️';
         btn.classList.add('rec');
+        btn.title = 'Runā... (klikšķis aptur)';
+
     }).catch(function(err) { alert('Mikrofons nav pieejams: ' + err.message); });
 }
 
-function stopRec() {
-    if (mediaRecorder && recording) {
+function stopRec(send) {
+    if (!recording) return;
+    recording = false;
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    silenceStart = null;
+    btn.style.opacity = '1';
+    btn.classList.remove('rec');
+    btn.textContent = '🎙️';
+    btn.title = 'Nospied un runā';
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
+
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        if (!send) {
+            /* Atcēla — izmet datus */
+            mediaRecorder.ondataavailable = null;
+            mediaRecorder.onstop = function() {};
+        }
         mediaRecorder.stop();
-        recording = false;
-        btn.textContent = '🎙️';
-        btn.classList.remove('rec');
     }
 }
 </script>
