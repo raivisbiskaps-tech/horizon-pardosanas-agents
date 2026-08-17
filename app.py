@@ -181,17 +181,21 @@ def load_gemini_client():
 
 # ── Balss transkripcija ───────────────────────────────────────────────────────
 
-def transcribe_audio(audio_bytes: bytes) -> str | None:
-    """Transkribē audio ar Groq Whisper large-v3 (latviešu valoda)."""
+def transcribe_audio(audio_bytes: bytes, mime_type: str = "audio/webm") -> str | None:
+    """Transkribē audio ar Groq Whisper large-v3 (latviešu valoda).
+    Atbalsta: webm, ogg, wav, mp3, mp4, m4a.
+    """
     try:
         from groq import Groq
         api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
         if not api_key:
             st.warning("⚠️ GROQ_API_KEY nav iestatīts — balss ievade nav pieejama.")
             return None
+        # Iegūst faila paplašinājumu no MIME tipa ("audio/webm;codecs=opus" → "webm")
+        ext = mime_type.split("/")[-1].split(";")[0].strip()
         client = Groq(api_key=api_key)
         transcription = client.audio.transcriptions.create(
-            file=("audio.wav", audio_bytes, "audio/wav"),
+            file=(f"audio.{ext}", audio_bytes, mime_type.split(";")[0]),
             model="whisper-large-v3",
             language="lv",
         )
@@ -199,6 +203,23 @@ def transcribe_audio(audio_bytes: bytes) -> str | None:
     except Exception as e:
         st.error(f"❌ Balss atpazīšanas kļūda: {e}")
         return None
+
+
+# ── Custom čata ievades komponents ────────────────────────────────────────────
+
+import streamlit.components.v1 as _stc
+
+_CHAT_INPUT_MIC_PATH = os.path.join(BASE_DIR, "components", "chat_input_mic")
+_chat_input_mic_fn   = _stc.declare_component("chat_input_mic", path=_CHAT_INPUT_MIC_PATH)
+
+
+def chat_input_mic(reset_counter: int = 0) -> dict | None:
+    """Teksta ievades lauks ar integrētu mic pogu.
+    Atgriež {"type": "text", "data": "..."} vai
+             {"type": "audio", "data": "<base64>", "mimeType": "audio/webm"}
+    vai None, ja nav ievades.
+    """
+    return _chat_input_mic_fn(reset_counter=reset_counter, key="chat_input_mic", default=None)
 
 
 # ── RAG ───────────────────────────────────────────────────────────────────────
@@ -1293,63 +1314,22 @@ def main():
                     for src in msg["sources"]:
                         st.text(f"• {src}")
 
-    # ── Balss ievade ─────────────────────────────────────────────────────────
-    from streamlit_mic_recorder import mic_recorder
-    import streamlit.components.v1 as _components
+    # ── Čata ievade ar integrētu mic pogu ────────────────────────────────────
+    if "input_counter" not in st.session_state:
+        st.session_state.input_counter = 0
 
-    col_mic, _ = st.columns([1, 20])
-    with col_mic:
-        audio_data = mic_recorder(
-            start_prompt="🎙️",
-            stop_prompt="⏹️",
-            just_once=True,
-            use_container_width=True,
-            key="mic_recorder",
-        )
+    result = chat_input_mic(reset_counter=st.session_state.input_counter)
+    question = None
 
-    # JS: fiksē mic iframe kreisajā pusē pie chat input
-    _components.html("""
-<script>
-(function() {
-    var pd = window.parent.document;
-    function fix() {
-        var mic  = pd.querySelector('iframe[title*="mic_recorder"]');
-        var chat = pd.querySelector('[data-testid="stChatInputContainer"]');
-        if (!mic || !chat) return;
-        var r   = chat.getBoundingClientRect();
-        var col = mic.closest('[data-testid="stColumn"]') || mic.parentElement;
-        Object.assign(col.style, {
-            position:        'fixed',
-            bottom:          (window.parent.innerHeight - r.bottom) + 'px',
-            left:            (r.left + 6) + 'px',
-            width:           '42px',
-            height:          r.height + 'px',
-            zIndex:          '9999',
-            display:         'flex',
-            alignItems:      'center',
-            justifyContent:  'center',
-            pointerEvents:   'auto',
-        });
-        mic.style.cssText = 'width:42px;height:42px;border:none;background:transparent;';
-        chat.style.paddingLeft = '54px';
-    }
-    fix();
-    new MutationObserver(fix).observe(pd.body, {childList: true, subtree: true});
-    window.parent.addEventListener('resize', fix);
-})();
-</script>
-""", height=0, width=0)
+    if result:
+        if result.get("type") == "text":
+            question = result["data"]
+        elif result.get("type") == "audio":
+            import base64 as _b64
+            audio_bytes = _b64.b64decode(result["data"])
+            with st.spinner("Atpazīstu runu..."):
+                question = transcribe_audio(audio_bytes, result.get("mimeType", "audio/webm"))
 
-    if audio_data:
-        with st.spinner("Atpazīstu runu..."):
-            voice_text = transcribe_audio(audio_data["bytes"])
-        if voice_text:
-            st.session_state.voice_input = voice_text
-            st.rerun()
-
-    # ── Teksta ievade ─────────────────────────────────────────────────────────
-    _typed   = st.chat_input("Raksti vai ierunā jautājumu...")
-    question = st.session_state.pop("voice_input", None) or _typed
     if question:
         st.session_state.messages.append({"role": "user", "content": question})
         with st.chat_message("user"):
@@ -1423,6 +1403,8 @@ def main():
             "sources":   sources,
             "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
         })
+        # Atiestata ievades lauku (palielina skaitītāju → komponents notīrās)
+        st.session_state.input_counter += 1
 
     # Modeļa noklusējums
     if "selected_model" not in st.session_state:

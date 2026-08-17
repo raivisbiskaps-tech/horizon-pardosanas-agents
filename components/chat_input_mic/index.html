@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: transparent;
+    font-family: "Source Sans Pro", sans-serif;
+    overflow: hidden;
+  }
+
+  .row {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    padding: 6px 8px;
+    background: #fff;
+    border: 1px solid #d3d3d3;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    transition: border-color 0.2s;
+  }
+  .row:focus-within { border-color: #7c7cf0; }
+
+  /* Mic poga */
+  #micBtn {
+    flex-shrink: 0;
+    width: 34px; height: 34px;
+    border: none; background: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 17px;
+    display: flex; align-items: center; justify-content: center;
+    color: #555;
+    transition: background 0.15s, color 0.15s;
+  }
+  #micBtn:hover { background: #f0f0f0; }
+  #micBtn.recording {
+    color: #fff;
+    background: #e53935;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(229,57,53,0.4); }
+    50%       { box-shadow: 0 0 0 7px rgba(229,57,53,0); }
+  }
+
+  /* Teksta lauks */
+  #textInput {
+    flex: 1;
+    border: none; outline: none; resize: none;
+    font-size: 15px;
+    line-height: 1.5;
+    min-height: 24px;
+    max-height: 140px;
+    overflow-y: auto;
+    background: transparent;
+    color: #111;
+    padding: 5px 2px;
+  }
+  #textInput::placeholder { color: #aaa; }
+
+  /* Sūtīt poga */
+  #sendBtn {
+    flex-shrink: 0;
+    width: 34px; height: 34px;
+    border: none;
+    background: #7c7cf0;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    transition: background 0.15s, opacity 0.15s;
+    opacity: 0.35;
+  }
+  #sendBtn.active { opacity: 1; }
+  #sendBtn:hover.active { background: #5c5cd0; }
+</style>
+</head>
+<body>
+
+<div class="row">
+  <button id="micBtn" title="Ierunāt">🎙️</button>
+  <textarea id="textInput" rows="1" placeholder="Raksti vai ierunā jautājumu..."></textarea>
+  <button id="sendBtn" title="Nosūtīt">▶</button>
+</div>
+
+<script src="https://unpkg.com/streamlit-component-lib@2.0.0/dist/streamlit-component-lib.js"></script>
+<script>
+"use strict";
+
+const micBtn    = document.getElementById("micBtn");
+const textInput = document.getElementById("textInput");
+const sendBtn   = document.getElementById("sendBtn");
+
+let mediaRecorder = null;
+let audioChunks   = [];
+let isRecording   = false;
+let lastCounter   = -1;
+
+/* ── Streamlit inicializācija ─────────────────────────────── */
+function onRender(event) {
+  const args = event.detail.args || {};
+  const counter = args.reset_counter ?? 0;
+  if (counter !== lastCounter) {
+    lastCounter = counter;
+    textInput.value = "";
+    textInput.style.height = "auto";
+    if (isRecording) stopRecording();
+    sendBtn.classList.remove("active");
+    updateHeight();
+  }
+}
+
+Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
+Streamlit.setFrameHeight(58);
+Streamlit.ready();
+
+/* ── Augstuma pielāgošana ─────────────────────────────────── */
+function updateHeight() {
+  textInput.style.height = "auto";
+  textInput.style.height = Math.min(textInput.scrollHeight, 140) + "px";
+  const total = document.querySelector(".row").getBoundingClientRect().height;
+  Streamlit.setFrameHeight(Math.ceil(total) + 14);
+}
+
+textInput.addEventListener("input", () => {
+  updateHeight();
+  sendBtn.classList.toggle("active", textInput.value.trim().length > 0);
+});
+
+/* ── Teksta ievade ────────────────────────────────────────── */
+textInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    submitText();
+  }
+});
+sendBtn.addEventListener("click", submitText);
+
+function submitText() {
+  const text = textInput.value.trim();
+  if (!text) return;
+  Streamlit.setComponentValue({ type: "text", data: text });
+}
+
+/* ── Balss ieraksts ───────────────────────────────────────── */
+micBtn.addEventListener("click", async () => {
+  if (isRecording) {
+    stopRecording();
+  } else {
+    await startRecording();
+  }
+});
+
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks = [];
+
+    // Izvēlas labāko pieejamo formātu
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "audio/ogg";
+
+    mediaRecorder = new MediaRecorder(stream, { mimeType });
+
+    mediaRecorder.addEventListener("dataavailable", (e) => {
+      if (e.data.size > 0) audioChunks.push(e.data);
+    });
+
+    mediaRecorder.addEventListener("stop", () => {
+      const blob = new Blob(audioChunks, { type: mimeType });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result.split(",")[1];
+        Streamlit.setComponentValue({ type: "audio", data: base64, mimeType });
+      };
+      reader.readAsDataURL(blob);
+      stream.getTracks().forEach((t) => t.stop());
+    });
+
+    mediaRecorder.start();
+    isRecording = true;
+    micBtn.textContent = "⏹️";
+    micBtn.classList.add("recording");
+    micBtn.title = "Apturēt ierakstu";
+  } catch (err) {
+    alert("Mikrofons nav pieejams: " + err.message);
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && isRecording) {
+    mediaRecorder.stop();
+    isRecording = false;
+    micBtn.textContent = "🎙️";
+    micBtn.classList.remove("recording");
+    micBtn.title = "Ierunāt";
+  }
+}
+</script>
+</body>
+</html>
