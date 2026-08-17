@@ -181,6 +181,42 @@ def load_gemini_client():
 
 # ── Balss transkripcija ───────────────────────────────────────────────────────
 
+# ── Balss transkripcija ───────────────────────────────────────────────────────
+
+def transcribe_audio(audio_bytes: bytes, mime_type: str = "audio/webm") -> str | None:
+    try:
+        from groq import Groq
+        api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
+        if not api_key:
+            st.warning("⚠️ GROQ_API_KEY nav iestatīts — balss ievade nav pieejama.")
+            return None
+        ext = mime_type.split("/")[-1].split(";")[0].strip()
+        client = Groq(api_key=api_key)
+        transcription = client.audio.transcriptions.create(
+            file=(f"audio.{ext}", audio_bytes, mime_type.split(";")[0]),
+            model="whisper-large-v3",
+            language="lv",
+        )
+        return transcription.text.strip()
+    except Exception as e:
+        st.error(f"❌ Balss atpazīšanas kļūda: {e}")
+        return None
+
+
+# ── Mic pogas komponents ──────────────────────────────────────────────────────
+
+@st.cache_resource
+def _get_mic_button_fn():
+    import streamlit.components.v1 as _stc
+    path = os.path.join(BASE_DIR, "components", "mic_button")
+    return _stc.declare_component("mic_button", path=path)
+
+
+def mic_button(reset_counter: int = 0) -> dict | None:
+    fn = _get_mic_button_fn()
+    return fn(reset_counter=reset_counter, key="mic_button", default=None)
+
+
 # ── RAG ───────────────────────────────────────────────────────────────────────
 
 def retrieve_context(collection, question: str) -> tuple[str, list[str]]:
@@ -1274,7 +1310,58 @@ def main():
                         st.text(f"• {src}")
 
     # ── Čata ievade ───────────────────────────────────────────────────────────────
-    question = st.chat_input("Raksti jautājumu...")
+    # JS novieto mic_button iframe tieši pa kreisi no st.chat_input sūtīšanas pogas.
+    st.markdown("""<script>
+(function () {
+    function fix() {
+        var mic = document.querySelector('iframe[title="mic_button"]');
+        if (!mic) return;
+        // Sakļauj vietu normālajā plūsmā
+        var wrap = mic.parentElement;
+        while (wrap && wrap !== document.body) {
+            if (wrap.getAttribute('data-testid') === 'stElementContainer') {
+                wrap.style.cssText = 'height:0!important;overflow:hidden!important;padding:0!important;margin:0!important;';
+                break;
+            }
+            wrap = wrap.parentElement;
+        }
+        // Novieto blakus sūtīšanas pogai
+        var sendBtn = document.querySelector('[data-testid="stBottom"] button');
+        if (!sendBtn) return;
+        var r = sendBtn.getBoundingClientRect();
+        var sz = 36;
+        Object.assign(mic.style, {
+            position:   'fixed',
+            bottom:     Math.round(window.innerHeight - r.top - r.height / 2 - sz / 2) + 'px',
+            right:      Math.round(window.innerWidth  - r.left + 6) + 'px',
+            width:      sz + 'px',
+            height:     sz + 'px',
+            border:     'none',
+            zIndex:     '10001',
+            background: 'transparent',
+        });
+    }
+    fix();
+    new MutationObserver(fix).observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('resize', fix);
+})();
+</script>""", unsafe_allow_html=True)
+
+    text_input = st.chat_input("Raksti vai ierunā jautājumu...")
+
+    if "mic_counter" not in st.session_state:
+        st.session_state.mic_counter = 0
+    audio_result = mic_button(reset_counter=st.session_state.mic_counter)
+
+    question = None
+    if text_input:
+        question = text_input
+    elif audio_result and audio_result.get("type") == "audio":
+        import base64 as _b64
+        audio_bytes = _b64.b64decode(audio_result["data"])
+        with st.spinner("Atpazīstu runu..."):
+            question = transcribe_audio(audio_bytes, audio_result.get("mimeType", "audio/webm"))
+        st.session_state.mic_counter += 1
 
     if question:
         st.session_state.messages.append({"role": "user", "content": question})
