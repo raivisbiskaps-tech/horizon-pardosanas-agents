@@ -109,7 +109,8 @@ setInterval(fix, 1500);
 window.parent.addEventListener('resize', fix);
 
 /* ── Klusuma detektors ────────────────────────────────────────────────────── */
-var SILENCE_THRESHOLD = 0.01;  // RMS amplitūda — zemāk = klusums
+var SPEECH_THRESHOLD  = 0.04;  // RMS — virs šī = runa konstatēta
+var SILENCE_THRESHOLD = 0.02;  // RMS — zem šī pēc runas = klusums
 var SILENCE_DELAY_MS  = 1500;  // ms klusuma pirms apstājas
 
 var btn         = document.getElementById('btn');
@@ -152,6 +153,7 @@ function startRec() {
 
         var buf = new Uint8Array(analyser.fftSize);
         silenceStart = null;
+        var speechDetected = false;  // klusuma taimeris sākas tikai pēc runas
 
         function checkSilence() {
             if (!recording) return;
@@ -165,21 +167,23 @@ function startRec() {
             }
             var rms = Math.sqrt(sum / buf.length);
 
-            if (rms < SILENCE_THRESHOLD) {
-                /* Klusums */
+            if (rms >= SPEECH_THRESHOLD) {
+                /* Aktīva runa */
+                speechDetected = true;
+                silenceStart   = null;
+                btn.style.opacity = '1';
+            } else if (speechDetected && rms < SILENCE_THRESHOLD) {
+                /* Klusums — bet tikai ja runa jau bijusi */
                 if (!silenceStart) silenceStart = Date.now();
                 var elapsed = Date.now() - silenceStart;
-
-                /* Atjaunina pulsa efektu — palēnina kad klusums */
-                btn.style.opacity = Math.max(0.4, 1 - elapsed / SILENCE_DELAY_MS / 1.5);
-
+                btn.style.opacity = Math.max(0.35, 1 - elapsed / SILENCE_DELAY_MS);
                 if (elapsed >= SILENCE_DELAY_MS) {
                     stopRec(true);
                     return;
                 }
             } else {
-                /* Runa — atiestata klusuma taimeri */
-                silenceStart = null;
+                /* Starpstāvoklis (fona troksnis) — atiestata tikai klusuma taimeri */
+                if (speechDetected) silenceStart = null;
                 btn.style.opacity = '1';
             }
 
