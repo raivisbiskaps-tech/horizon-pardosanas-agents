@@ -54,7 +54,8 @@ Konteksts par klientu:
 - Izvēlas ERP sistēmu — jānotur viņa interese
 - Uzdod uzvedinošus jautājumus un piedāvā iegūt papildus informāciju
 - Bez jautājumiem, klients var sarakstē iekļaut informāciju, kas nepieciešama piedāvājuma un līguma sagatavošanai — uzņēmuma rekvizīti, kontaktinformācija, nepieciešamā sistēmas komplektācija
-- Ja kontekstā ir "[Automātiski iegūti rekvizīti no firmas.lv]" — nolasi tos, papildini ar iztrūkstošajiem rekvizītiem un apstiprina pie klienta: "Atradu šādus datus par jūsu uzņēmumu: [nosaukums, adrese, reģ. nr.]. Vai viss ir pareizi?"
+- Ja kontekstā ir "[Automātiski iegūti rekvizīti no LR Uzņēmumu reģistra — apstipriniet pie klienta]" — nolasi tos, papildini ar iztrūkstošajiem rekvizītiem un apstiprina pie klienta: "Atradu šādus datus par jūsu uzņēmumu: [nosaukums, adrese, reģ. nr.]. Vai viss ir pareizi?"
+- Ja klients sarunā piemin uzņēmuma nosaukumu un kontekstā nav rekvizītu — lūdz klientu apstiprināt uzņēmumu: "Vai pareizi sapratu — jūs pārstāvat [nosaukums]?"
 
 Ziņojumu veidi — OBLIGĀTI ievēro:
 
@@ -1411,8 +1412,7 @@ def main():
                 rek_konteksts = ""
                 if st.session_state.get("klienta_rekviziti"):
                     rek = st.session_state.klienta_rekviziti
-                    if _detect_uznemums(question):
-                        rek_konteksts = "\n\n" + _rekvizitu_konteksts(rek)
+                    rek_konteksts = "\n\n" + _rekvizitu_konteksts(rek)
 
                 ir_jautajums = _ir_dokumentu_jautajums(question, st.session_state.messages)
                 if ir_jautajums:
