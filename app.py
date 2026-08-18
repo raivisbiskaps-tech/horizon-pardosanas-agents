@@ -179,7 +179,9 @@ def load_bedrock_client():
     region  = os.getenv("AWS_REGION")      or _secret("AWS_REGION", "us-east-1")
     if not api_key:
         return None
-    base_url = f"https://bedrock.{region}.amazonaws.com"
+    # Bedrock endpoint: /anthropic/v1/messages
+    # SDK pievieno /v1/messages → base_url beidzas ar /anthropic
+    base_url = f"https://bedrock.{region}.amazonaws.com/anthropic"
     return anthropic.Anthropic(api_key=api_key, base_url=base_url)
 
 
@@ -322,7 +324,7 @@ Jautājums: {question}"""
                     messages=bedrock_messages,
                 )
                 if not response or not response.content:
-                    return "❌ Claude neatgrieza atbildi."
+                    return f"❌ Claude neatgrieza atbildi. Response: {response}"
                 return response.content[0].text
 
             elif provider == "mistral":
