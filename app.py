@@ -1145,7 +1145,7 @@ def _detect_uznemums(teksts: str) -> str | None:
     LV_UPPER = "A-ZĀČĒĢĪĶĻŅŠŪŽ"
     LV_LOWER = "a-zāčēģīķļņšūž"
     caps_matches = re.findall(
-        rf'\b[{LV_UPPER}][{LV_LOWER}]{{2,}}(?:\s+[{LV_UPPER}][{LV_LOWER}]{{1,}}{{1,3}})\b',
+        rf'\b[{LV_UPPER}][{LV_LOWER}]{{2,}}(?:\s+[{LV_UPPER}][{LV_LOWER}]{{1,}}){{1,3}}\b',
         teksts
     )
     for candidate in caps_matches:
