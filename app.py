@@ -179,9 +179,9 @@ def load_bedrock_client():
     region  = os.getenv("AWS_REGION")      or _secret("AWS_REGION", "us-east-1")
     if not api_key:
         return None
-    # Bedrock endpoint: /anthropic/v1/messages
-    # SDK pievieno /v1/messages → base_url beidzas ar /anthropic
-    base_url = f"https://bedrock.{region}.amazonaws.com/anthropic"
+    # Bedrock runtime endpoint — SDK pievieno /v1/messages
+    # Pilnais ceļš: /anthropic/v1/messages
+    base_url = f"https://bedrock-runtime.{region}.amazonaws.com/anthropic"
     return anthropic.Anthropic(api_key=api_key, base_url=base_url)
 
 
