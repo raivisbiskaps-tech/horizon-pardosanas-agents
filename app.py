@@ -32,8 +32,8 @@ TOP_K_RESULTS   = 30
 
 # Pieejamie modeļi
 MODELS = {
-    "🟣 Claude Sonnet":  {"provider": "bedrock", "model": "anthropic.claude-sonnet-4-5"},
-    "🟣 Claude Haiku":   {"provider": "bedrock", "model": "anthropic.claude-haiku-4-5-20251001"},
+    "🟣 Claude Sonnet":  {"provider": "bedrock", "model": "claude-sonnet-4-5"},
+    "🟣 Claude Haiku":   {"provider": "bedrock", "model": "claude-haiku-4-5-20251001"},
     "🟠 Mistral Small":  {"provider": "mistral", "model": "mistral-small-latest"},
     "🟠 Mistral Large":  {"provider": "mistral", "model": "mistral-large-2411"},
     "🔵 Gemini Flash":   {"provider": "gemini",  "model": "gemini-1.5-flash"},
@@ -167,13 +167,15 @@ def load_collection():
 
 @st.cache_resource(show_spinner="Savieno ar Claude...")
 def load_bedrock_client():
-    """Inicializē Claude klientu caur Bedrock API key."""
+    """Inicializē Claude klientu caur AWS Bedrock Bearer token (ABSK...)."""
     import anthropic
     api_key = os.getenv("BEDROCK_API_KEY") or st.secrets.get("BEDROCK_API_KEY", "")
+    region  = os.getenv("AWS_REGION") or st.secrets.get("AWS_REGION", "us-east-1")
     if not api_key:
         return None
-    # Bedrock API key (ABSK...) — izmantojam kā parasto Anthropic klientu
-    return anthropic.Anthropic(api_key=api_key)
+    # Jaunais Bedrock (Opus 4.7+): Bearer token + Bedrock endpoint
+    base_url = f"https://bedrock.{region}.amazonaws.com"
+    return anthropic.Anthropic(api_key=api_key, base_url=base_url)
 
 
 # ── Mistral klients ───────────────────────────────────────────────────────────
