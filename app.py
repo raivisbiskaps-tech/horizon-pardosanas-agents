@@ -169,11 +169,16 @@ def load_collection():
 def load_bedrock_client():
     """Inicializē Claude klientu caur AWS Bedrock Bearer token (ABSK...)."""
     import anthropic
-    api_key = os.getenv("BEDROCK_API_KEY") or st.secrets.get("BEDROCK_API_KEY", "")
-    region  = os.getenv("AWS_REGION") or st.secrets.get("AWS_REGION", "us-east-1")
+    def _secret(key, default=""):
+        try:
+            return st.secrets[key]
+        except Exception:
+            return default
+
+    api_key = os.getenv("BEDROCK_API_KEY") or _secret("BEDROCK_API_KEY")
+    region  = os.getenv("AWS_REGION")      or _secret("AWS_REGION", "us-east-1")
     if not api_key:
         return None
-    # Jaunais Bedrock (Opus 4.7+): Bearer token + Bedrock endpoint
     base_url = f"https://bedrock.{region}.amazonaws.com"
     return anthropic.Anthropic(api_key=api_key, base_url=base_url)
 
@@ -316,6 +321,8 @@ Jautājums: {question}"""
                     system=SYSTEM_PROMPT,
                     messages=bedrock_messages,
                 )
+                if not response or not response.content:
+                    return "❌ Claude neatgrieza atbildi."
                 return response.content[0].text
 
             elif provider == "mistral":
