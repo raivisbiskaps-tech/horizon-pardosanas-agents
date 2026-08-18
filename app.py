@@ -1497,7 +1497,7 @@ def main():
 
     # Modeļa noklusējums
     if "selected_model" not in st.session_state:
-        st.session_state.selected_model = "🟠 Mistral Small"
+        st.session_state.selected_model = "🟣 Claude Sonnet"
 
     # Sānjosla
     with st.sidebar:
@@ -1557,6 +1557,21 @@ def main():
                 elif pvn_aktīvs is False:
                     st.caption("**PVN:** ❌ nav reģistrēts")
                 st.markdown(f"[🔗 UR.gov.lv]({rek.get('url', '')})")
+
+        st.divider()
+
+        # ── AI modelis ────────────────────────────────────────────────────────
+        st.header("🤖 AI modelis")
+        selected = st.selectbox(
+            "Izvēlies modeli:",
+            options=list(MODELS.keys()),
+            index=list(MODELS.keys()).index(st.session_state.selected_model),
+            key="model_selectbox",
+            label_visibility="collapsed",
+        )
+        if selected != st.session_state.selected_model:
+            st.session_state.selected_model = selected
+            st.rerun()
 
         st.divider()
 
