@@ -59,18 +59,18 @@ Konteksts par klientu:
 Ziņojumu veidi — OBLIGĀTI ievēro:
 
 1. JAUTĀJUMS par Horizon (piemēram: "Kādi moduļi ir pieejami?", "Cik maksā?")
-   → Atbildi no dokumentācijas
+   → Atbildi, balstoties uz sev pieejamo informāciju
 
 2. ATBILDE uz mūsu jautājumu (piemēram: "Jā", "Nē", "Vajag arī personālu", "10 lietotāji", "Tieši tā")
    → Interpretē kā atbildi uz pēdējo uzdoto jautājumu. NEKAD nesaki "nevaru sniegt atbildi". Apkopo saprasto un turpini.
 
 3. INFORMĀCIJAS sniegšana (piemēram: uzņēmuma nosaukums, reģ. nr., kontaktpersona, adrese)
-   → Uztver kā faktu. Apstiprina saņemšanu ("Paldies, piefiksēju!"). NEKAD nemēģini meklēt šo dokumentācijā.
+   → Uztver kā faktu. Apstiprina saņemšanu ("Paldies, piefiksēju!"). NEKAD nemēģini pārbaudīt vai apstrīdēt šo informāciju.
 
 4. UZDEVUMS vai KOMANDA (piemēram: "Sagatavo līgumu", "Gatavo tāmi", "Nosūti piedāvājumu")
-   → Izpildi vai apstiprina nodomu. NEKAD nesaki "nevaru sniegt atbildi no dokumentācijas".
+   → Izpildi vai apstiprina nodomu. NEKAD nesaki "nevaru sniegt atbildi".
 
-Ja nav skaidrs uz kuru jautājumu klients atbild — pārjautā konkrēti, nevis norādi uz dokumentācijas trūkumu.
+Ja nav skaidrs uz kuru jautājumu klients atbild — pārjautā konkrēti.
 
 Terminoloģija:
 - "Bizness" un "Ražošana" = Horizon papildiespēju paku nosaukumi (nevis vispārīgi vārdi)
@@ -257,16 +257,16 @@ def ask_ai(question: str, context: str, model_name: str,
     model_id  = model_cfg["model"]
 
     if izmanto_rag and context:
-        user_message = f"""Zemāk ir VIENĪGIE dokumentu fragmenti, ko drīksti izmantot atbildē.
-Ja atbilde nav šajos fragmentos — nekādā gadījumā to neizdomā.
+        user_message = f"""Zemāk ir pieejamā informācija, ko drīksti izmantot atbildē.
+Ja atbilde nav šajā informācijā — nekādā gadījumā to neizdomā. NEKAD neatsaucies uz "fragmentiem", "dokumentiem" vai "dokumentāciju" — izmanto: "pēc man pieejamās informācijas", "atbilstoši manām zināšanām".
 
-=== DOKUMENTU FRAGMENTI ===
+=== PIEEJAMĀ INFORMĀCIJA ===
 {context}
 === BEIGAS ===
 
 Jautājums: {question}"""
     else:
-        # Atbilde/komanda/informācija — turpina sarakstes loģiku bez dokumentu ierobežojuma
+        # Atbilde/komanda/informācija — turpina sarakstes loģiku bez RAG ierobežojuma
         user_message = question
 
     # Veido ziņojumu sarakstu ar sarakstes vēsturi
@@ -1423,7 +1423,7 @@ def main():
                 pilns_konteksts = (context or "") + rek_konteksts
 
                 if not pilns_konteksts and ir_jautajums:
-                    answer_raw = "Šī informācija nav pieejama dokumentācijā."
+                    answer_raw = "Atbilstoši manām zināšanām, uz šo jautājumu nevarēšu sniegt precīzu atbildi. Jūsu jautājumu esmu piefiksējis un nosūtīšu menedžerim, kurš ar jums sazināsies tuvākajā laikā. [ACTION:NEZINA]"
                 else:
                     answer_raw = ask_ai(
                         question, pilns_konteksts,
