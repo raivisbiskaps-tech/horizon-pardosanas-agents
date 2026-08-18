@@ -32,6 +32,8 @@ TOP_K_RESULTS   = 30
 
 # Pieejamie modeļi
 MODELS = {
+    "🟣 Claude Sonnet":  {"provider": "bedrock", "model": "anthropic.claude-sonnet-4-5"},
+    "🟣 Claude Haiku":   {"provider": "bedrock", "model": "anthropic.claude-haiku-4-5-20251001"},
     "🟠 Mistral Small":  {"provider": "mistral", "model": "mistral-small-latest"},
     "🟠 Mistral Large":  {"provider": "mistral", "model": "mistral-large-2411"},
     "🔵 Gemini Flash":   {"provider": "gemini",  "model": "gemini-1.5-flash"},
@@ -161,6 +163,18 @@ def load_collection():
         st.stop()
 
 
+# ── Bedrock (Claude) klients ──────────────────────────────────────────────────
+
+@st.cache_resource(show_spinner="Savieno ar Claude...")
+def load_bedrock_client():
+    """Inicializē Claude klientu caur AWS Bedrock API key."""
+    import anthropic
+    api_key = os.getenv("BEDROCK_API_KEY") or st.secrets.get("BEDROCK_API_KEY", "")
+    if not api_key:
+        return None
+    return anthropic.AnthropicBedrock(aws_bedrock_api_key=api_key)
+
+
 # ── Mistral klients ───────────────────────────────────────────────────────────
 
 @st.cache_resource(show_spinner="Savieno ar AI...")
@@ -287,7 +301,21 @@ Jautājums: {question}"""
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            if provider == "mistral":
+            if provider == "bedrock":
+                client = load_bedrock_client()
+                if not client:
+                    return "❌ BEDROCK_API_KEY nav iestatīts Streamlit Secrets."
+                # Anthropic API: system ir atsevišķs parametrs, nevis messages sarakstā
+                bedrock_messages = [m for m in messages if m["role"] != "system"]
+                response = client.messages.create(
+                    model=model_id,
+                    max_tokens=2048,
+                    system=SYSTEM_PROMPT,
+                    messages=bedrock_messages,
+                )
+                return response.content[0].text
+
+            elif provider == "mistral":
                 client = load_mistral_client()
                 if not client:
                     return "❌ MISTRAL_API_KEY nav iestatīts Streamlit Secrets."
