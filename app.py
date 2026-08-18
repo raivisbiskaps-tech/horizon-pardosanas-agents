@@ -41,13 +41,13 @@ MODELS = {
 SYSTEM_PROMPT = """Tu esi pieredzējis ERP Horizon pārdošanas atbalsta speciālists. Strādā uzņēmumā VISMA, kas izplata, izstrādā un ievieš ERP Horizon.
 
 Noteikumi:
-- Balsties tikai un vienīgi uz informāciju, kas pieejama pievienotajos dokumentos un klienta sarakstē sniegtajā informācijā
+- Balsties uz sev pieejamo informāciju un klienta sarakstē sniegtajiem faktiem
 - Pilnīgas, detalizētas atbildes — ne pārāk īsas, ne pārāk garas
-- Izmanto piemērus no dokumentācijas
-- Ja atbilde nav dokumentos → "Uz šo jautājumu nevarēšu sniegt precīzu atbildi, zvaniet Santai :)."
 - Nekad neizdomā informāciju
 - Ja jautājums ir neskaidrs, lūdz precizējumu
 - Atbild tajā pašā valodā
+- NEKAD neminē "dokumentus", "dokumentāciju" vai "avotus" — izmanto formulējumus: "pēc man pieejamās informācijas", "atbilstoši manām zināšanām", "cik man zināms" u.tml.
+- Ja nevari atbildēt uz jautājumu → atbildi: "Atbilstoši manām zināšanām, uz šo jautājumu nevarēšu sniegt precīzu atbildi. Jūsu jautājumu esmu piefiksējis un nosūtīšu menedžerim, kurš ar jums sazināsies tuvākajā laikā." Pievieno marķieri [ACTION:NEZINA]
 
 Konteksts par klientu:
 - Potenciāls klients bez Horizon zināšanām
@@ -101,6 +101,7 @@ Darbību marķieri — ieviešanas tāmes un piedāvājuma sagatavošanai:
 CHAT_MARKERS = {
     "[ACTION:TAME]":   "tāme",
     "[ACTION:LIGUMS]": "līgums",
+    "[ACTION:NEZINA]": "nezina",
 }
 
 def parse_markers(text: str) -> tuple[str, list[str]]:
@@ -112,12 +113,16 @@ def parse_markers(text: str) -> tuple[str, list[str]]:
     # Piemēri: [ACTION:TAME], [**ACTION:TAME**], [ACTION TAME], utt.
     tame_pat   = re.compile(r'\[\*{0,2}ACTION[:\s_-]*TAME\*{0,2}\]',   re.IGNORECASE)
     ligums_pat = re.compile(r'\[\*{0,2}ACTION[:\s_-]*LIGUMS?\*{0,2}\]', re.IGNORECASE)
+    nezina_pat = re.compile(r'\[\*{0,2}ACTION[:\s_-]*NEZINA\*{0,2}\]',  re.IGNORECASE)
     if tame_pat.search(text):
         text = tame_pat.sub("", text)
         found.append("tāme")
     if ligums_pat.search(text):
         text = ligums_pat.sub("", text)
         found.append("līgums")
+    if nezina_pat.search(text):
+        text = nezina_pat.sub("", text)
+        found.append("nezina")
     return text.strip(), found
 
 
@@ -525,6 +530,38 @@ def send_chat_by_email(messages: list, user_email: str = "") -> tuple[bool, str]
         return True, f"✅ Saruna nosūtīta uz {saņēmēji_teksts}"
     except Exception as e:
         return False, f"❌ Sūtīšanas kļūda: {e}"
+
+
+def send_unanswered_question(question: str, user_email: str = "") -> tuple[bool, str]:
+    """Nosūta neatbildēto klienta jautājumu uz menedžera e-pastu."""
+    gmail_user     = os.getenv("GMAIL_USER")
+    gmail_password = os.getenv("GMAIL_APP_PASSWORD")
+    recipients     = _email_recipients(user_email)
+
+    if not all([gmail_user, gmail_password]) or not recipients:
+        return False, ""
+
+    timestamp = datetime.now().strftime("%d.%m.%Y %H:%M")
+    body = (
+        f"Horizon pārdošanas aģents — neatbildēts jautājums\n"
+        f"Datums: {timestamp}\n"
+        f"Lietotājs: {user_email or '—'}\n"
+        f"{'=' * 50}\n\n"
+        f"{question}\n"
+    )
+    email_msg = MIMEMultipart()
+    email_msg["From"]    = gmail_user
+    email_msg["To"]      = ", ".join(recipients)
+    email_msg["Subject"] = f"❓ Neatbildēts jautājums — {timestamp}"
+    email_msg.attach(MIMEText(body, "plain", "utf-8"))
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(gmail_user, gmail_password)
+            server.sendmail(gmail_user, recipients, email_msg.as_string())
+        return True, ", ".join(recipients)
+    except Exception as e:
+        return False, str(e)
 
 
 # ── Uzņēmumu reģistrs caur data.gov.lv API ───────────────────────────────────
@@ -1398,6 +1435,13 @@ def main():
             answer, markers = parse_markers(answer_raw)
 
             st.markdown(answer)
+
+            # Automātiska nosūtīšana ja AI nevar atbildēt
+            if "nezina" in markers:
+                user_email = st.session_state.get("authenticated_user", "")
+                ok, sent_to = send_unanswered_question(question, user_email)
+                if ok:
+                    st.info(f"📧 Jautājums nosūtīts menedžerim uz: **{sent_to}**")
             tables = extract_markdown_tables(answer)
             if tables:
                 excel_bytes = tables_to_excel_bytes(tables)
