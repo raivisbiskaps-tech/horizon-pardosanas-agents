@@ -167,12 +167,13 @@ def load_collection():
 
 @st.cache_resource(show_spinner="Savieno ar Claude...")
 def load_bedrock_client():
-    """Inicializē Claude klientu caur AWS Bedrock API key."""
+    """Inicializē Claude klientu caur Bedrock API key."""
     import anthropic
     api_key = os.getenv("BEDROCK_API_KEY") or st.secrets.get("BEDROCK_API_KEY", "")
     if not api_key:
         return None
-    return anthropic.AnthropicBedrock(aws_bedrock_api_key=api_key)
+    # Bedrock API key (ABSK...) — izmantojam kā parasto Anthropic klientu
+    return anthropic.Anthropic(api_key=api_key)
 
 
 # ── Mistral klients ───────────────────────────────────────────────────────────
