@@ -32,8 +32,8 @@ TOP_K_RESULTS   = 30
 
 # Pieejamie modeļi
 MODELS = {
-    "🟣 Claude Haiku":   {"provider": "bedrock", "model": "claude-haiku-4-5-20251001"},
-    "🟣 Claude Sonnet":  {"provider": "bedrock", "model": "claude-sonnet-4-5-20251001"},
+    "🟣 Claude Haiku":   {"provider": "bedrock", "model": "anthropic.claude-haiku-4-5-20251001"},
+    "🟣 Claude Sonnet":  {"provider": "bedrock", "model": "anthropic.claude-sonnet-5"},
     "🟠 Mistral Small":  {"provider": "mistral", "model": "mistral-small-latest"},
     "🟠 Mistral Large":  {"provider": "mistral", "model": "mistral-large-2411"},
     "🔵 Gemini Flash":   {"provider": "gemini",  "model": "gemini-1.5-flash"},
