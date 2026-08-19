@@ -324,7 +324,11 @@ Jautājums: {question}"""
                 )
                 if not response or not response.content:
                     return f"❌ Claude neatgrieza atbildi. Response: {response}"
-                return response.content[0].text
+                # Meklē pirmo TextBlock — izlaiž ThinkingBlock
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        return block.text
+                return "❌ Claude atbildē nav teksta bloka."
 
             elif provider == "mistral":
                 client = load_mistral_client()
