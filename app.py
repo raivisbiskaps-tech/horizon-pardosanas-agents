@@ -1595,10 +1595,14 @@ def main():
 
         # PVN debug info
         if st.session_state.get("klienta_rekviziti"):
-            dbg = st.session_state.klienta_rekviziti.get("_debug", "")
-            if dbg:
-                with st.expander("🔍 PVN debug"):
-                    st.caption(dbg)
+            with st.expander("🔍 PVN debug"):
+                rek_dbg = st.session_state.klienta_rekviziti
+                st.caption(f"pvn_aktīvs: {rek_dbg.get('pvn_aktīvs')}")
+                st.caption(f"pvn_numurs: {rek_dbg.get('pvn_numurs')}")
+                st.caption(f"reg_numurs: {rek_dbg.get('reg_numurs')}")
+                st.caption(f"_debug: {rek_dbg.get('_debug', '(nav — vecā sesija)')}")
+        else:
+            st.caption("⚠️ klienta_rekviziti nav session state")
 
         st.divider()
 
