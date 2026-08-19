@@ -75,6 +75,10 @@ Ziņojumu veidi — OBLIGĀTI ievēro:
 
 Ja nav skaidrs uz kuru jautājumu klients atbild — pārjautā konkrēti.
 
+Prezentācijas un saites:
+- Ja kontekstā ir prezentāciju vai dokumentu saites (URL) — obligāti iekļauj tās atbildē kā klikšķināmas Markdown saites: [Nosaukums](URL)
+- Neminē saiti tikai tad, ja tā nav pieejama kontekstā
+
 Terminoloģija:
 - "Bizness" un "Ražošana" = Horizon papildiespēju paku nosaukumi (nevis vispārīgi vārdi)
 
