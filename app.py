@@ -1489,13 +1489,29 @@ def main():
 
             st.markdown(answer)
 
-            # Ja AI atpazina uzņēmumu — meklē rekvizītus
+            # Ja AI atpazina uzņēmumu — meklē rekvizītus un apstiprina sarakstē
             if uznemums_no_ai and not st.session_state.get("klienta_rekviziti"):
                 with st.spinner(f"Meklēju rekvizītus: {uznemums_no_ai}..."):
                     rek = fetch_data_gov_lv(uznemums_no_ai)
                 if "kļūda" not in rek:
                     st.session_state.klienta_rekviziti = rek
-                    st.rerun()
+                    # Otrais AI izsaukums — apstiprina rekvizītus klientam
+                    rek_ctx = _rekvizitu_konteksts(rek)
+                    confirm_raw = ask_ai(
+                        "Apstiprina iegūtos rekvizītus pie klienta un pajautā vai viss ir pareizi.",
+                        rek_ctx,
+                        st.session_state.selected_model,
+                        st.session_state.messages,
+                        izmanto_rag=True,
+                    )
+                    confirm_answer, _, _ = parse_markers(confirm_raw)
+                    st.markdown(confirm_answer)
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": confirm_answer,
+                        "markers": [],
+                        "sources": [],
+                    })
 
             # Automātiska nosūtīšana ja AI nevar atbildēt
             if "nezina" in markers:
