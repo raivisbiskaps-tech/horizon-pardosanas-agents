@@ -1489,13 +1489,21 @@ def main():
 
             st.markdown(answer)
 
+            # Galvenā atbilde — pievieno vēsturei PIRMS confirm
+            st.session_state.messages.append({
+                "role":      "assistant",
+                "content":   answer,
+                "markers":   markers,
+                "sources":   sources,
+                "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+            })
+
             # Ja AI atpazina uzņēmumu — meklē rekvizītus un apstiprina sarakstē
             if uznemums_no_ai and not st.session_state.get("klienta_rekviziti"):
                 with st.spinner(f"Meklēju rekvizītus: {uznemums_no_ai}..."):
                     rek = fetch_data_gov_lv(uznemums_no_ai)
                 if "kļūda" not in rek:
                     st.session_state.klienta_rekviziti = rek
-                    # Otrais AI izsaukums — apstiprina rekvizītus klientam
                     rek_ctx = _rekvizitu_konteksts(rek)
                     confirm_raw = ask_ai(
                         "Apstiprina iegūtos rekvizītus pie klienta un pajautā vai viss ir pareizi.",
@@ -1505,12 +1513,14 @@ def main():
                         izmanto_rag=True,
                     )
                     confirm_answer, _, _ = parse_markers(confirm_raw)
-                    st.markdown(confirm_answer)
+                    with st.chat_message("assistant"):
+                        st.markdown(confirm_answer)
                     st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": confirm_answer,
-                        "markers": [],
-                        "sources": [],
+                        "role":      "assistant",
+                        "content":   confirm_answer,
+                        "markers":   [],
+                        "sources":   [],
+                        "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
                     })
 
             # Automātiska nosūtīšana ja AI nevar atbildēt
@@ -1536,14 +1546,6 @@ def main():
                     for src in sources:
                         st.text(f"• {src}")
 
-        st.session_state.messages.append({
-            "role":      "assistant",
-            "content":   answer,
-            "markers":   markers,
-            "sources":   sources,
-            "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
-        })
-
     # Modeļa noklusējums
     if "selected_model" not in st.session_state:
         st.session_state.selected_model = "🟣 Claude Sonnet"
@@ -1564,48 +1566,6 @@ def main():
             st.session_state.authenticated      = False
             st.session_state.authenticated_user = ""
             st.rerun()
-
-        st.divider()
-
-        # ── Klienta rekvizīti ─────────────────────────────────────────────────
-        st.header("🏢 Klienta rekvizīti")
-        reg_input = st.text_input(
-            "Meklēt uzņēmumu:",
-            placeholder="reģ. nr., nosaukums vai PVN nr.",
-            key="firmas_meklet_input",
-        )
-        if st.button("🔍 Iegūt rekvizītus"):
-            if not reg_input.strip():
-                st.warning("⚠️ Ievadi reģistrācijas numuru, nosaukumu vai PVN numuru.")
-            else:
-                with st.spinner("Meklē firmas.lv..."):
-                    rek = fetch_data_gov_lv(reg_input.strip())
-                if "kļūda" in rek:
-                    st.error(rek["kļūda"])
-                else:
-                    st.session_state.klienta_rekviziti = rek
-                    st.success(f"✅ {rek.get('nosaukums', 'Atrasts!')}")
-        if st.session_state.get("klienta_rekviziti"):
-            rek = st.session_state.klienta_rekviziti
-            with st.expander("📋 Rekvizīti", expanded=True):
-                for atslega, nosaukums in [
-                    ("nosaukums",        "Nosaukums"),
-                    ("tips",             "Tips"),
-                    ("reg_numurs",       "Reģ. nr."),
-                    ("juridiska_adrese", "Juridiskā adrese"),
-                    ("registrēts",       "Reģistrēts"),
-                    ("sepa",             "SEPA"),
-                ]:
-                    val = rek.get(atslega, "")
-                    if val:
-                        st.caption(f"**{nosaukums}:** {val}")
-                # PVN statuss
-                pvn_aktīvs = rek.get("pvn_aktīvs")
-                if pvn_aktīvs is True:
-                    st.caption(f"**PVN:** ✅ {rek.get('pvn_numurs','')} (reģ. {rek.get('pvn_reģ','')})")
-                elif pvn_aktīvs is False:
-                    st.caption("**PVN:** ❌ nav reģistrēts")
-                st.markdown(f"[🔗 UR.gov.lv]({rek.get('url', '')})")
 
         st.divider()
 
