@@ -91,6 +91,7 @@ Darbību marķieri — ieviešanas tāmes un piedāvājuma sagatavošanai:
 - Izvērtē sarakstes kontekstu — ko jau zinām
 - Uzdod tikai trūkstošos precizējošos jautājumus (moduļi, lietotāju skaits u.tml.)
 - Apkopo saprasto un pārjautā klientam
+- [ACTION:UZNEMUMS:nosaukums_vai_regnr] — pievieno UZREIZ kad klients piemin uzņēmuma nosaukumu vai reģistrācijas numuru; aizstāj "nosaukums_vai_regnr" ar faktisko nosaukumu vai numuru (piemēram: [ACTION:UZNEMUMS:Latvijas Gāze] vai [ACTION:UZNEMUMS:40003007394]). Pievieno tikai PIRMO reizi — ja rekvizīti jau ir kontekstā, vairs nepievieno.
 - [ACTION:TAME] — pievieno pēc klienta apstiprinājuma par nepieciešamajiem moduļiem
 - [ACTION:LIGUMS] — pievieno kad ir pietiekami daudz info līgumam; OBLIGĀTI jābūt zināmam uzņēmuma nosaukumam VAI reģistrācijas numuram, pretējā gadījumā vispirms papraси: "Lai sagatavotu līgumu, lūdzu norādiet uzņēmuma nosaukumu un reģistrācijas numuru."
 - [ACTION:NEZINA] — pievieno kad nevari atbildēt uz jautājumu
@@ -107,16 +108,18 @@ CHAT_MARKERS = {
     "[ACTION:NEZINA]": "nezina",
 }
 
-def parse_markers(text: str) -> tuple[str, list[str]]:
+def parse_markers(text: str) -> tuple[str, list[str], str | None]:
     """Izvelk darbību marķierus no AI atbildes.
-    Atgriež (tīrs teksts bez marķieriem, atrasto marķieru saraksts).
+    Atgriež (tīrs teksts bez marķieriem, atrasto marķieru saraksts, uzņēmuma nosaukums vai None).
     """
     found = []
-    # Izmanto regex — izturīgi pret Markdown formatēšanu (**) un citām variācijām
-    # Piemēri: [ACTION:TAME], [**ACTION:TAME**], [ACTION TAME], utt.
-    tame_pat   = re.compile(r'\[\*{0,2}ACTION[:\s_-]*TAME\*{0,2}\]',   re.IGNORECASE)
-    ligums_pat = re.compile(r'\[\*{0,2}ACTION[:\s_-]*LIGUMS?\*{0,2}\]', re.IGNORECASE)
-    nezina_pat = re.compile(r'\[\*{0,2}ACTION[:\s_-]*NEZINA\*{0,2}\]',  re.IGNORECASE)
+    uznemums_val = None
+
+    tame_pat     = re.compile(r'\[\*{0,2}ACTION[:\s_-]*TAME\*{0,2}\]',            re.IGNORECASE)
+    ligums_pat   = re.compile(r'\[\*{0,2}ACTION[:\s_-]*LIGUMS?\*{0,2}\]',          re.IGNORECASE)
+    nezina_pat   = re.compile(r'\[\*{0,2}ACTION[:\s_-]*NEZINA\*{0,2}\]',           re.IGNORECASE)
+    uznemums_pat = re.compile(r'\[\*{0,2}ACTION[:\s_-]*UZNEMUMS[:\s_-]*([^\]]+?)\*{0,2}\]', re.IGNORECASE)
+
     if tame_pat.search(text):
         text = tame_pat.sub("", text)
         found.append("tāme")
@@ -126,7 +129,13 @@ def parse_markers(text: str) -> tuple[str, list[str]]:
     if nezina_pat.search(text):
         text = nezina_pat.sub("", text)
         found.append("nezina")
-    return text.strip(), found
+    m = uznemums_pat.search(text)
+    if m:
+        uznemums_val = m.group(1).strip()
+        text = uznemums_pat.sub("", text)
+        found.append("uznemums")
+
+    return text.strip(), found, uznemums_val
 
 
 # ── Indeksēšana ───────────────────────────────────────────────────────────────
@@ -1444,23 +1453,14 @@ def main():
         with st.chat_message("assistant"):
             with st.spinner("Prātoju ..."):
 
-                # Automātiska rekvizītu iegūšana — ja nav jau iegūti
+                # Rekvizītu iegūšana — tikai ja skaidrs reģ. nr. ir tekstā
                 if not st.session_state.get("klienta_rekviziti"):
-                    # Meklē uzņēmuma nosaukumu pašreizējā ziņojumā, tad vēsturē
-                    vaicajums = _detect_uznemums(question)
-                    if not vaicajums:
-                        for msg in reversed(st.session_state.messages[:-1]):
-                            if msg["role"] == "user":
-                                vaicajums = _detect_uznemums(msg["content"])
-                                if vaicajums:
-                                    break
-                    if vaicajums:
-                        with st.spinner(f"Meklēju rekvizītus: {vaicajums}..."):
-                            rek = fetch_data_gov_lv(vaicajums)
+                    reg_match = re.search(r'\b\d{11}\b', question)
+                    if reg_match:
+                        with st.spinner("Meklēju rekvizītus..."):
+                            rek = fetch_data_gov_lv(reg_match.group(0))
                         if "kļūda" not in rek:
                             st.session_state.klienta_rekviziti = rek
-                        else:
-                            st.caption(f"ℹ️ Rekvizīti nav atrasti: {rek.get('kļūda','')}")
 
                 rek_konteksts = ""
                 if st.session_state.get("klienta_rekviziti"):
@@ -1485,9 +1485,17 @@ def main():
                         izmanto_rag=ir_jautajums or bool(rek_konteksts),
                     )
 
-            answer, markers = parse_markers(answer_raw)
+            answer, markers, uznemums_no_ai = parse_markers(answer_raw)
 
             st.markdown(answer)
+
+            # Ja AI atpazina uzņēmumu — meklē rekvizītus
+            if uznemums_no_ai and not st.session_state.get("klienta_rekviziti"):
+                with st.spinner(f"Meklēju rekvizītus: {uznemums_no_ai}..."):
+                    rek = fetch_data_gov_lv(uznemums_no_ai)
+                if "kļūda" not in rek:
+                    st.session_state.klienta_rekviziti = rek
+                    st.rerun()
 
             # Automātiska nosūtīšana ja AI nevar atbildēt
             if "nezina" in markers:
