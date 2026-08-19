@@ -1446,11 +1446,21 @@ def main():
 
                 # Automātiska rekvizītu iegūšana — ja nav jau iegūti
                 if not st.session_state.get("klienta_rekviziti"):
+                    # Meklē uzņēmuma nosaukumu pašreizējā ziņojumā, tad vēsturē
                     vaicajums = _detect_uznemums(question)
+                    if not vaicajums:
+                        for msg in reversed(st.session_state.messages[:-1]):
+                            if msg["role"] == "user":
+                                vaicajums = _detect_uznemums(msg["content"])
+                                if vaicajums:
+                                    break
                     if vaicajums:
-                        rek = fetch_data_gov_lv(vaicajums)
+                        with st.spinner(f"Meklēju rekvizītus: {vaicajums}..."):
+                            rek = fetch_data_gov_lv(vaicajums)
                         if "kļūda" not in rek:
                             st.session_state.klienta_rekviziti = rek
+                        else:
+                            st.caption(f"ℹ️ Rekvizīti nav atrasti: {rek.get('kļūda','')}")
 
                 rek_konteksts = ""
                 if st.session_state.get("klienta_rekviziti"):
