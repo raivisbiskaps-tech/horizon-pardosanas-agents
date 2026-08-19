@@ -1618,6 +1618,8 @@ def main():
                 st.error(msg)
         if st.button("🗑️ Notīrīt čatu", use_container_width=True):
             st.session_state.messages = []
+            st.session_state.klienta_rekviziti = None
+            st.session_state.processed_audio_id = None
             st.rerun()
         if st.button("🔄 Pārindeksēt dokumentus", use_container_width=True):
             st.cache_resource.clear()
