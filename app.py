@@ -625,43 +625,54 @@ _DGL_API_URL     = "https://data.gov.lv/api/3/action/datastore_search"
 
 
 def fetch_pvn_status(regcode_str: str) -> dict:
-    """Pārbauda PVN maksātāja statusu VID datubāzē pēc reģistrācijas numura.
-
-    Atgriež:
-      pvn_numurs   – "LVxxxxxxxxxx" vai ""
-      pvn_aktīvs   – True/False
-      pvn_reģ      – reģistrācijas datums kā PVN maksātājs
-      pvn_izsl     – izslēgšanas datums (ja bijis un izslēgts)
-    """
+    """Pārbauda PVN maksātāja statusu VID datubāzē pēc reģistrācijas numura."""
     import requests as req
     import json as _json
 
     pvn_num = f"LV{regcode_str}"
+    _empty = {"pvn_numurs": "", "pvn_aktīvs": None, "pvn_reģ": "", "pvn_izsl": "", "_debug": ""}
+
     try:
-        r = req.get(
-            _DGL_API_URL,
-            params={
-                "resource_id": _VID_RESOURCE_ID,
-                "filters":     _json.dumps({"Numurs": pvn_num}),
-                "limit":       1,
-            },
-            timeout=8,
-        )
-        r.raise_for_status()
-        records = r.json().get("result", {}).get("records", [])
-    except Exception:
-        return {"pvn_numurs": "", "pvn_aktīvs": None, "pvn_reģ": "", "pvn_izsl": ""}
+        # Meklē pēc PVN numura — vispirms ar filters, tad ar q
+        for params in [
+            {"resource_id": _VID_RESOURCE_ID, "filters": _json.dumps({"Numurs": pvn_num}), "limit": 1},
+            {"resource_id": _VID_RESOURCE_ID, "q": pvn_num, "limit": 5},
+        ]:
+            r = req.get(_DGL_API_URL, params=params, timeout=8)
+            r.raise_for_status()
+            result = r.json().get("result", {})
+            records = result.get("records", [])
+            if records:
+                break
+
+        # Debug: pieglabā lauku nosaukumus pirmajā atbildē
+        fields = [f["id"] for f in result.get("fields", [])]
+
+    except Exception as e:
+        return {**_empty, "_debug": f"API kļūda: {e}"}
 
     if not records:
-        return {"pvn_numurs": "", "pvn_aktīvs": False, "pvn_reģ": "", "pvn_izsl": ""}
+        return {**_empty, "pvn_aktīvs": False, "_debug": f"Nav atrasts (meklēts: {pvn_num}), lauki: {fields}"}
 
     rec = records[0]
-    aktīvs = rec.get("Aktivs", "").strip().lower() == "ir"
+    # Mēģina dažādus iespējamos lauku nosaukumus
+    def _get(*keys):
+        for k in keys:
+            v = rec.get(k, "")
+            if v:
+                return str(v).strip()
+        return ""
+
+    aktīvs_str = _get("Aktivs", "aktivs", "AKTIVS", "active", "status")
+    aktīvs = aktīvs_str.lower() in ("ir", "true", "1", "yes", "aktīvs")
+    pvn_numurs = _get("Numurs", "numurs", "NUMURS", "pvn_numurs") or pvn_num
+
     return {
-        "pvn_numurs": pvn_num if aktīvs or rec.get("Izslegts", "").strip() else "",
+        "pvn_numurs": pvn_numurs,
         "pvn_aktīvs": aktīvs,
-        "pvn_reģ":    rec.get("Registrets", "").strip(),
-        "pvn_izsl":   rec.get("Izslegts", "").strip(),
+        "pvn_reģ":    _get("Registrets", "registrets", "reg_date", "Reģistrēts"),
+        "pvn_izsl":   _get("Izslegts", "izslegts", "end_date"),
+        "_debug":     f"Lauki: {fields}, Aktivs='{aktīvs_str}'",
     }
 
 
@@ -1581,6 +1592,13 @@ def main():
         if selected != st.session_state.selected_model:
             st.session_state.selected_model = selected
             st.rerun()
+
+        # PVN debug info
+        if st.session_state.get("klienta_rekviziti"):
+            dbg = st.session_state.klienta_rekviziti.get("_debug", "")
+            if dbg:
+                with st.expander("🔍 PVN debug"):
+                    st.caption(dbg)
 
         st.divider()
 
