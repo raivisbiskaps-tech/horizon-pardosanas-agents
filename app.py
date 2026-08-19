@@ -696,7 +696,7 @@ def fetch_data_gov_lv(vaicajums: str) -> dict:
         }
 
     try:
-        r = req.get(_UR_API_URL, params=params, timeout=10)
+        r = req.get(_DGL_API_URL, params=params, timeout=10)
         r.raise_for_status()
         data = r.json()
     except Exception as e:
