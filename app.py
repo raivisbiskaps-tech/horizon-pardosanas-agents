@@ -28,7 +28,7 @@ BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 CHROMA_DIR   = os.path.join(BASE_DIR, "chroma_db")
 DOCS_DIR     = os.path.join(BASE_DIR, "docs")
 COLLECTION_NAME = "dokumentacija"
-TOP_K_RESULTS   = 30
+TOP_K_RESULTS   = 60
 
 # Pieejamie modeļi
 MODELS = {
