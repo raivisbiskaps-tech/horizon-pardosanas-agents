@@ -1552,7 +1552,17 @@ def main():
                 user_email = st.session_state.get("authenticated_user", "")
                 ok, sent_to = send_unanswered_question(question, user_email)
                 if ok:
-                    st.info(f"📧 Jautājums nosūtīts menedžerim uz: **{sent_to}**")
+                    notif = f"📧 {sent_to}"
+                else:
+                    notif = ""
+                if notif:
+                    with st.chat_message("assistant"):
+                        st.info(notif)
+                    st.session_state.messages.append({
+                        "role": "assistant", "content": notif,
+                        "markers": [], "sources": [],
+                        "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+                    })
             tables = extract_markdown_tables(answer)
             if tables:
                 excel_bytes = tables_to_excel_bytes(tables)
