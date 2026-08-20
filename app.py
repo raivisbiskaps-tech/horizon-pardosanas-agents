@@ -340,7 +340,7 @@ Jautājums: {question}"""
                 bedrock_messages = [m for m in messages if m["role"] != "system"]
                 response = client.messages.create(
                     model=model_id,
-                    max_tokens=2048,
+                    max_tokens=8192,
                     system=SYSTEM_PROMPT,
                     messages=bedrock_messages,
                 )
