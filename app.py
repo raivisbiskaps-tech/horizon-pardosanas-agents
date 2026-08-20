@@ -261,10 +261,19 @@ def mic_button(reset_counter: int = 0) -> dict | None:
 
 # ── RAG ───────────────────────────────────────────────────────────────────────
 
-def retrieve_context(collection, question: str) -> tuple[str, list[str]]:
-    """Meklē relevantos fragmentus ChromaDB."""
+def retrieve_context(collection, question: str, history: list = None) -> tuple[str, list[str]]:
+    """Meklē relevantos fragmentus ChromaDB.
+    Vaicājumu bagātina ar sarakstes kontekstu labākai atbilstībai.
+    """
+    # Bagātināts vaicājums — pievieno pēdējos 2 user ziņojumus kontekstam
+    enriched = question
+    if history:
+        prev_user = [m["content"] for m in history[-5:] if m["role"] == "user"][-2:]
+        if prev_user:
+            enriched = " ".join(prev_user) + " " + question
+
     results = collection.query(
-        query_texts=[question],
+        query_texts=[enriched],
         n_results=TOP_K_RESULTS,
         include=["documents", "metadatas", "distances"],
     )
@@ -274,7 +283,7 @@ def retrieve_context(collection, question: str) -> tuple[str, list[str]]:
         results["metadatas"][0],
         results["distances"][0],
     ):
-        if dist < 0.95:
+        if dist < 1.2:  # Paaugstināts slieksnis — iekļauj plašāku dokumentu klāstu
             src = meta.get("source", "nezināms")
             context_parts.append(f"[Avots: {src}]\n{doc}")
             if src not in sources:
@@ -1484,7 +1493,7 @@ def main():
 
                 ir_jautajums = _ir_dokumentu_jautajums(question, st.session_state.messages)
                 if ir_jautajums:
-                    context, sources = retrieve_context(collection, question)
+                    context, sources = retrieve_context(collection, question, st.session_state.messages)
                 else:
                     context, sources = "", []
 
