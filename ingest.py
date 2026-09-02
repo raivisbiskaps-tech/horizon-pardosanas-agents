@@ -75,11 +75,9 @@ def extract_excel(filepath: Path) -> str:
     xl = pd.ExcelFile(str(filepath))
     for sheet_name in xl.sheet_names:
         df = xl.parse(sheet_name)
-        # Notīra kolonnu nosaukumus
         df.columns = [str(c).strip() for c in df.columns]
         text_parts.append(f"[Lapa: {sheet_name}]")
         for _, row in df.iterrows():
-            # Formatē katru lauku kā "Kolonnas nosaukums: vērtība"
             fields = []
             for col, val in row.items():
                 if pd.notna(val) and str(val).strip():
@@ -87,6 +85,35 @@ def extract_excel(filepath: Path) -> str:
             if fields:
                 text_parts.append(" | ".join(fields))
     return "\n".join(text_parts)
+
+
+def extract_excel_as_chunks(filepath: Path) -> list[dict]:
+    """Xlsx failus glabā pa lapām kā atsevišķus dokumentus — bez rakstzīmju sadalīšanas.
+    Tā tabulas netiek sagrozītas starp gabaliem.
+    """
+    chunks = []
+    xl = pd.ExcelFile(str(filepath))
+    source = filepath.name
+    for sheet_idx, sheet_name in enumerate(xl.sheet_names):
+        df = xl.parse(sheet_name)
+        df.columns = [str(c).strip() for c in df.columns]
+        rows = []
+        rows.append(f"[Fails: {source}] [Lapa: {sheet_name}]")
+        for _, row in df.iterrows():
+            fields = []
+            for col, val in row.items():
+                if pd.notna(val) and str(val).strip():
+                    fields.append(f"{col}: {str(val).strip()}")
+            if fields:
+                rows.append(" | ".join(fields))
+        text = "\n".join(rows)
+        if len(text.strip()) >= 50:
+            chunks.append({
+                "text": text,
+                "source": source,
+                "chunk_index": sheet_idx,
+            })
+    return chunks
 
 
 def extract_markdown(filepath: Path) -> str:
@@ -246,6 +273,17 @@ def ingest(docs_dir: str = DOCS_DIR):
 
     for filepath in doc_files:
         print(f"📄 Apstrādā: {filepath.name}")
+
+        # xlsx/xls — katra lapa kā viens dokuments (bez rakstzīmju sadalīšanas)
+        if filepath.suffix.lower() in (".xlsx", ".xls"):
+            chunks = extract_excel_as_chunks(filepath)
+            if not chunks:
+                print(f"  ⚠️  Teksts nav atrasts vai pārāk īss, izlaižam.\n")
+                continue
+            print(f"  ✅ {len(chunks)} lapas kā atsevišķi dokumenti\n")
+            all_chunks.extend(chunks)
+            continue
+
         text = extract_text(filepath)
         if not text or len(text.strip()) < 50:
             print(f"  ⚠️  Teksts nav atrasts vai pārāk īss, izlaižam.\n")

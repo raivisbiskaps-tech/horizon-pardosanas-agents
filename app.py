@@ -278,6 +278,7 @@ def retrieve_context(collection, question: str, history: list = None) -> tuple[s
         include=["documents", "metadatas", "distances"],
     )
     context_parts, sources = [], []
+    matched_sources = set()
     for doc, meta, dist in zip(
         results["documents"][0],
         results["metadatas"][0],
@@ -288,6 +289,27 @@ def retrieve_context(collection, question: str, history: list = None) -> tuple[s
             context_parts.append(f"[Avots: {src}]\n{doc}")
             if src not in sources:
                 sources.append(src)
+            matched_sources.add(src)
+
+    # Ja no kāda avota atrasts vismaz viens gabals — ielādē VISUS gabalus no tā avota
+    # (svarīgi sarakstu/tabulu failiem, kur katrs ieraksts ir atsevišķs gabals)
+    if matched_sources:
+        existing = set(context_parts)
+        for src in matched_sources:
+            try:
+                all_in_source = collection.get(
+                    where={"source": src},
+                    include=["documents", "metadatas"],
+                )
+                for doc, meta in zip(all_in_source["documents"], all_in_source["metadatas"]):
+                    s = meta.get("source", "nezināms")
+                    entry = f"[Avots: {s}]\n{doc}"
+                    if entry not in existing:
+                        context_parts.append(entry)
+                        existing.add(entry)
+            except Exception:
+                pass
+
     return "\n\n---\n\n".join(context_parts), sources
 
 
