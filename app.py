@@ -170,7 +170,16 @@ def load_collection():
         model_name="paraphrase-multilingual-mpnet-base-v2"
     )
     try:
-        return client.get_collection(name=COLLECTION_NAME, embedding_function=emb_fn)
+        col = client.get_collection(name=COLLECTION_NAME, embedding_function=emb_fn)
+        # Debug: parāda cik dokumenti ir indeksēti un kādi xlsx faili
+        total = col.count()
+        all_meta = col.get(include=["metadatas"], limit=10000)
+        xlsx_sources = sorted({
+            m.get("source", "") for m in all_meta["metadatas"]
+            if m.get("source", "").lower().endswith((".xlsx", ".xls"))
+        })
+        print(f"[ChromaDB] Kopā {total} dokumenti. xlsx avoti: {xlsx_sources}")
+        return col
     except Exception as e:
         st.error(f"❌ Kolekcija nav atrasta: {e}")
         st.stop()
@@ -292,7 +301,6 @@ def retrieve_context(collection, question: str, history: list = None) -> tuple[s
             matched_sources.add(src)
 
     # Ja no kāda avota atrasts vismaz viens gabals — ielādē VISUS gabalus no tā avota
-    # (svarīgi sarakstu/tabulu failiem, kur katrs ieraksts ir atsevišķs gabals)
     if matched_sources:
         existing = set(context_parts)
         for src in matched_sources:
@@ -309,6 +317,31 @@ def retrieve_context(collection, question: str, history: list = None) -> tuple[s
                         existing.add(entry)
             except Exception:
                 pass
+
+    # xlsx faili ir uzziņu tabulas — vienmēr iekļauj, neatkarīgi no vektoru rezultātiem
+    existing = set(context_parts)
+    xlsx_names = [
+        f for f in os.listdir(DOCS_DIR)
+        if f.lower().endswith((".xlsx", ".xls"))
+    ]
+    for xlsx_name in xlsx_names:
+        if xlsx_name in matched_sources:
+            continue  # jau iekļauts iepriekš
+        try:
+            res = collection.get(
+                where={"source": xlsx_name},
+                include=["documents", "metadatas"],
+            )
+            for doc, meta in zip(res["documents"], res["metadatas"]):
+                s = meta.get("source", xlsx_name)
+                entry = f"[Avots: {s}]\n{doc}"
+                if entry not in existing:
+                    context_parts.append(entry)
+                    existing.add(entry)
+                    if s not in sources:
+                        sources.append(s)
+        except Exception:
+            pass
 
     return "\n\n---\n\n".join(context_parts), sources
 
@@ -1622,6 +1655,19 @@ def main():
             st.session_state.authenticated      = False
             st.session_state.authenticated_user = ""
             st.rerun()
+
+        st.divider()
+
+        # ── DEBUG: ChromaDB avoti ──────────────────────────────────────────────
+        if st.button("🔍 Parādi avotus DB", use_container_width=True):
+            try:
+                res = collection.get(include=["metadatas"])
+                all_sources = sorted({m.get("source","?") for m in res["metadatas"]})
+                st.write(f"**{len(all_sources)} avoti:**")
+                for s in all_sources:
+                    st.caption(s)
+            except Exception as e:
+                st.error(f"Kļūda: {e}")
 
         st.divider()
 
