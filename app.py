@@ -232,23 +232,54 @@ def load_gemini_client():
 
 # ── Balss transkripcija ───────────────────────────────────────────────────────
 
-# ── Balss transkripcija ───────────────────────────────────────────────────────
-
 def transcribe_audio(audio_bytes: bytes, mime_type: str = "audio/webm") -> str | None:
+    """Transkribē audio izmantojot Groq Whisper.
+
+    Mēģina nosūtīt audio kā webm. Ja Groq noraida vai rezultāts šķiet kļūdains,
+    mēģina konvertēt uz wav (ja pydub pieejams).
+    """
     try:
         from groq import Groq
         api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY", "")
         if not api_key:
             st.warning("⚠️ GROQ_API_KEY nav iestatīts — balss ievade nav pieejama.")
             return None
-        ext = mime_type.split("/")[-1].split(";")[0].strip()
+
         client = Groq(api_key=api_key)
-        transcription = client.audio.transcriptions.create(
-            file=(f"audio.{ext}", audio_bytes, mime_type.split(";")[0]),
-            model="whisper-large-v3",
-            language="lv",
-        )
-        return transcription.text.strip()
+
+        # Groq atbalsta: mp3, mp4, mpeg, mpga, m4a, wav, webm, ogg
+        # Droši: nosūtam kā webm, MIME bez codec specifikācijas
+        clean_mime = mime_type.split(";")[0].strip()  # "audio/webm"
+        ext = clean_mime.split("/")[-1]               # "webm"
+
+        def _call(audio_b, file_ext, file_mime):
+            return client.audio.transcriptions.create(
+                file=(f"audio.{file_ext}", audio_b, file_mime),
+                model="whisper-large-v3-turbo",  # ātrāks un bieži precīzāks Eiropas val.
+                language="lv",
+                response_format="text",
+            )
+
+        result = _call(audio_bytes, ext, clean_mime)
+        text = result.strip() if isinstance(result, str) else (result.text or "").strip()
+
+        # Ja iegūtais teksts šķiet pārāk īss un neatbilst latviešu valodai —
+        # mēģina bez language=lv (auto detect) ar whisper-large-v3
+        if text and len(text.split()) <= 2:
+            try:
+                result2 = client.audio.transcriptions.create(
+                    file=(f"audio.{ext}", audio_bytes, clean_mime),
+                    model="whisper-large-v3",
+                    response_format="text",
+                )
+                text2 = result2.strip() if isinstance(result2, str) else (result2.text or "").strip()
+                if len(text2.split()) > len(text.split()):
+                    text = text2
+            except Exception:
+                pass
+
+        return text or None
+
     except Exception as e:
         st.error(f"❌ Balss atpazīšanas kļūda: {e}")
         return None
@@ -1515,6 +1546,15 @@ def main():
     st.sidebar.write("dedup bloķē?", _aid is not None and _aid == st.session_state.get("processed_audio_id"))
     st.sidebar.write("mic_counter:", st.session_state.mic_counter)
 
+    # Pēdējā ieraksta atskaņošana
+    if st.session_state.get("last_audio_bytes"):
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("**🔊 Pēdējais ieraksts:**")
+        st.sidebar.audio(
+            st.session_state.last_audio_bytes,
+            format=st.session_state.get("last_audio_mime", "audio/webm"),
+        )
+
     question = None
     if text_input:
         question = text_input
@@ -1525,13 +1565,15 @@ def main():
             # Reģistrējam audio_id PIRMS transkripcijas, counter arī
             st.session_state.processed_audio_id = audio_id
             st.session_state.mic_counter += 1
-            st.info(f"🎤 Audio saņemts ({len(_d)} simboli) — transkribēju...")
             try:
                 import base64 as _b64
-                audio_bytes = _b64.b64decode(_d)
+                audio_bytes_raw = _b64.b64decode(_d)
                 mime = audio_result.get("mimeType", "audio/webm")
+                # Saglabā pēdējo ierakstu atskaņošanai
+                st.session_state.last_audio_bytes = audio_bytes_raw
+                st.session_state.last_audio_mime  = mime.split(";")[0]
                 with st.spinner("Atpazīstu runu..."):
-                    question = transcribe_audio(audio_bytes, mime)
+                    question = transcribe_audio(audio_bytes_raw, mime)
                 if not question:
                     st.warning("⚠️ Neizdevās atpazīt runu — mēģini vēlreiz.")
                 else:
