@@ -258,6 +258,8 @@ def transcribe_audio(audio_bytes: bytes, mime_type: str = "audio/webm") -> str |
                 model="whisper-large-v3-turbo",  # ātrāks un bieži precīzāks Eiropas val.
                 language="lv",
                 response_format="text",
+                # prompt palīdz Whisper nesagriezt pirmo vārdu
+                prompt="Latvian ERP software sales conversation.",
             )
 
         result = _call(audio_bytes, ext, clean_mime)

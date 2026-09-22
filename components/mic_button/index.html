@@ -134,9 +134,11 @@ function startRec() {
             };
             reader.readAsDataURL(blob);
         };
-        mediaRecorder.start();
+        // Timeslice 100ms — nodrošina, ka audio dati tiek savākti regulāri,
+        // nevis tikai vienā gabalā beigās (novērš sākuma nogriezšanu)
+        mediaRecorder.start(100);
 
-        /* Web Audio */
+        /* Web Audio — tikai skaļuma noteikšanai */
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         var src  = audioCtx.createMediaStreamSource(stream);
         analyser = audioCtx.createAnalyser();
@@ -155,56 +157,50 @@ function startRec() {
             return Math.sqrt(sum / buf.length);
         }
 
-        /* Kalibrēšana */
+        /* Vienkārša inicializācija — fiksēts slieksnis, bez adaptīvās kalibrēšanas.
+           Adaptīvā kalibrēšana var uzstādīt pārāk augstu slieksni ja lietotājs runā
+           uzreiz pēc klikšķa, kas noved pie klusuma detektora pāragrā aktivizēšanās. */
         recording = true;
         btn.classList.add('rec');
         btn.style.opacity = '0.5';
-        btn.title = 'Kalibrē...';
+        btn.title = 'Gatavo...';
 
-        var calibSamples = [];
-        var calibStart   = Date.now();
+        var speechThresh = 0.025;   // fiksēts slieksnis — 0.025 RMS aptver normālu runu
         var recStart     = Date.now();
-        var speechThresh = 0.05;
 
-        var calibInterval = setInterval(function() {
-            calibSamples.push(getRms());
-            if (Date.now() - calibStart >= CALIB_MS) {
-                clearInterval(calibInterval);
+        // Īss 250ms aizkavējums lai MediaRecorder pilnīgi inicializējas
+        setTimeout(function() {
+            if (!recording) return;
+            btn.style.opacity = '1';
+            btn.title = 'Runā... (klikšķis aptur)';
+            silenceStart = Date.now();
 
-                var noise = calibSamples.reduce(function(a, b) { return a + b; }, 0) / calibSamples.length;
-                speechThresh = Math.max(noise * 6, 0.05);
-                btn.style.opacity = '1';
-                btn.title = 'Runā... (klikšķis aptur)';
+            /* Klusuma detektors — setInterval katras 50ms */
+            checkInterval = setInterval(function() {
+                if (!recording) { clearInterval(checkInterval); return; }
 
-                silenceStart = Date.now();  /* taimeris sākas uzreiz pēc kalibrēšanas */
+                /* Hard limit */
+                if (Date.now() - recStart >= MAX_REC_MS) {
+                    clearInterval(checkInterval);
+                    stopRec(true);
+                    return;
+                }
 
-                /* Klusuma detektors — setInterval katras 50ms */
-                checkInterval = setInterval(function() {
-                    if (!recording) { clearInterval(checkInterval); return; }
+                var rms = getRms();
 
-                    /* Hard limit */
-                    if (Date.now() - recStart >= MAX_REC_MS) {
-                        clearInterval(checkInterval);
-                        stopRec(true);
-                        return;
-                    }
-
-                    var rms = getRms();
-
-                    if (rms >= speechThresh) {
-                        silenceStart = Date.now();
-                        btn.style.opacity = '1';
-                    } else {
-                        var elapsed = Date.now() - silenceStart;
-                        btn.style.opacity = Math.max(0.35, 1 - elapsed / SILENCE_DELAY_MS);
+                if (rms >= speechThresh) {
+                    silenceStart = Date.now();
+                    btn.style.opacity = '1';
+                } else {
+                    var elapsed = Date.now() - silenceStart;
+                    btn.style.opacity = Math.max(0.35, 1 - elapsed / SILENCE_DELAY_MS);
                         if (elapsed >= SILENCE_DELAY_MS) {
                             clearInterval(checkInterval);
                             stopRec(true);
                         }
                     }
-                }, 50);
-            }
-        }, 30);
+                }, 50);  // checkInterval
+        }, 250);  // setTimeout — 250ms inicializācijas aizkavējums
 
     }).catch(function(err) { alert('Mikrofons nav pieejams: ' + err.message); });
 }
