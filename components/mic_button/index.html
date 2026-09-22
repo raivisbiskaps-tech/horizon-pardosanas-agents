@@ -95,25 +95,19 @@ window.parent.addEventListener('resize', fix);
 
 /* ── Ieraksts ────────────────────────────────────────────────────────── */
 var SILENCE_DELAY_MS = 3000;
-var MAX_REC_MS       = 30000;  // hard limit: 30s
+var MAX_REC_MS       = 30000;
 
-var btn           = document.getElementById('btn');
-var mediaRecorder = null, chunks = [], recording = false;
-var audioCtx      = null, analyser = null;
-var checkInterval = null;
-var silenceStart  = null;
+var btn            = document.getElementById('btn');
+var mediaRecorder  = null, chunks = [], recording = false;
+var audioCtx       = null, analyser = null;
+var checkInterval  = null, silenceStart = null;
+var _currentStream = null;  // aktīvā stream atsauce — vajadzīga stopRec(false) cleanup
 
-// ── Pre-warm mikrofona atļauja ─────────────────────────────────────────
-// Ielādējoties komponentei, pieprasa atļauju un UZREIZ atbrīvo stream.
-// Pēc atļaujas piešķiršanas pārlūks to kešo — katrs nākamais getUserMedia
-// aizsauc ~10ms nevis 300-800ms. Nekad neglabājam stream starp ierakstiem
-// (tas izraisīja kļūdas uz 4.+ reizi).
 function _prewarm() {
     navigator.mediaDevices.getUserMedia({ audio: true })
         .then(function(s) { s.getTracks().forEach(function(t) { t.stop(); }); })
         .catch(function() {});
 }
-
 setTimeout(_prewarm, 200);
 
 btn.addEventListener('click', function() {
@@ -126,9 +120,17 @@ function startRec() {
     btn.style.opacity = '0.6';
     btn.title = 'Gatavo...';
 
-    // Katru reizi iegūstam svaigu stream — atļauja jau ir kešota,
-    // tāpēc getUserMedia atgriežas ~10-50ms (nevis ~500ms pirmo reizi)
     navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+        // Ja stopRec(false) paspēja izpilties pirms getUserMedia atgriezās —
+        // atbrīvojam stream un pārtraucam (recording jau ir false)
+        if (!recording) {
+            stream.getTracks().forEach(function(t) { t.stop(); });
+            console.log('[mic] startRec aborted — recording cancelled before stream ready');
+            setTimeout(_prewarm, 200);
+            return;
+        }
+
+        _currentStream = stream;
         chunks = [];
 
         var mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
@@ -138,6 +140,7 @@ function startRec() {
         mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
         mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) chunks.push(e.data); };
         mediaRecorder.onstop = function() {
+            _currentStream = null;
             stream.getTracks().forEach(function(t) { t.stop(); });
             console.log('[mic] onstop fired, chunks:', chunks.length);
             var blob = new Blob(chunks, { type: mime });
@@ -147,77 +150,54 @@ function startRec() {
                 var b64 = reader.result.split(',')[1];
                 console.log('[mic] b64 length:', b64 ? b64.length : 0, '— sending setValue');
                 setValue({ type: 'audio', data: b64, mimeType: mime });
-                // Pre-warms nākamajam ierakstam
-                setTimeout(_prewarm, 500);
+                setTimeout(_prewarm, 300);
             };
-            reader.onerror = function(e) {
-                console.error('[mic] FileReader error:', e);
-            };
+            reader.onerror = function(e) { console.error('[mic] FileReader error:', e); };
             reader.readAsDataURL(blob);
         };
-        // Timeslice 100ms — nodrošina, ka audio dati tiek savākti regulāri,
-        // nevis tikai vienā gabalā beigās (novērš sākuma nogriezšanu)
         mediaRecorder.start(100);
 
-        /* Web Audio — tikai skaļuma noteikšanai */
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         var src  = audioCtx.createMediaStreamSource(stream);
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 512;
         src.connect(analyser);
-
         var buf = new Uint8Array(analyser.fftSize);
 
         function getRms() {
             analyser.getByteTimeDomainData(buf);
             var sum = 0;
-            for (var i = 0; i < buf.length; i++) {
-                var v = (buf[i] - 128) / 128;
-                sum += v * v;
-            }
+            for (var i = 0; i < buf.length; i++) { var v = (buf[i]-128)/128; sum += v*v; }
             return Math.sqrt(sum / buf.length);
         }
 
-        // Stream gatavs — ieraksts sākas tūlīt, nav jāgaida
-        var speechThresh = 0.025;
-        var recStart     = Date.now();
-
+        var speechThresh = 0.025, recStart = Date.now();
         btn.style.opacity = '1';
         btn.title = 'Runā... (klikšķis aptur)';
         silenceStart = Date.now();
 
-        /* Klusuma detektors — katras 50ms */
         checkInterval = setInterval(function() {
             if (!recording) { clearInterval(checkInterval); return; }
-
-            if (Date.now() - recStart >= MAX_REC_MS) {
-                clearInterval(checkInterval);
-                stopRec(true);
-                return;
-            }
-
+            if (Date.now() - recStart >= MAX_REC_MS) { clearInterval(checkInterval); stopRec(true); return; }
             var rms = getRms();
-
             if (rms >= speechThresh) {
                 silenceStart = Date.now();
                 btn.style.opacity = '1';
             } else {
                 var elapsed = Date.now() - silenceStart;
                 btn.style.opacity = Math.max(0.35, 1 - elapsed / SILENCE_DELAY_MS);
-                if (elapsed >= SILENCE_DELAY_MS) {
-                    clearInterval(checkInterval);
-                    stopRec(true);
-                }
+                if (elapsed >= SILENCE_DELAY_MS) { clearInterval(checkInterval); stopRec(true); }
             }
         }, 50);
 
     }).catch(function(err) {
         recording = false;
+        _currentStream = null;
         btn.classList.remove('rec');
         btn.style.opacity = '1';
         btn.title = 'Nospied un runā';
         alert('Mikrofons nav pieejams: ' + err.message);
-        setTimeout(_prewarm, 2000); // mēģina atjaunot atļauju
+        setTimeout(_prewarm, 2000);
     });
 }
 
@@ -234,10 +214,22 @@ function stopRec(send) {
 
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         if (!send) {
+            // Reset — nenosūtām audio, bet OBLIGĀTI aizveram stream un pre-warms
+            var s = _currentStream;
+            _currentStream = null;
             mediaRecorder.ondataavailable = null;
-            mediaRecorder.onstop = function() {};
+            mediaRecorder.onstop = function() {
+                if (s) s.getTracks().forEach(function(t) { t.stop(); });
+                console.log('[mic] stopRec(false) — stream closed, prewarming');
+                setTimeout(_prewarm, 300);
+            };
         }
         mediaRecorder.stop();
+    } else if (_currentStream) {
+        // getUserMedia atgriezās bet MediaRecorder vēl nav startēts
+        _currentStream.getTracks().forEach(function(t) { t.stop(); });
+        _currentStream = null;
+        setTimeout(_prewarm, 300);
     }
 }
 </script>
