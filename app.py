@@ -252,34 +252,14 @@ def transcribe_audio(audio_bytes: bytes, mime_type: str = "audio/webm") -> str |
         clean_mime = mime_type.split(";")[0].strip()  # "audio/webm"
         ext = clean_mime.split("/")[-1]               # "webm"
 
-        def _call(audio_b, file_ext, file_mime):
-            return client.audio.transcriptions.create(
-                file=(f"audio.{file_ext}", audio_b, file_mime),
-                model="whisper-large-v3-turbo",  # ātrāks un bieži precīzāks Eiropas val.
-                language="lv",
-                response_format="text",
-                # prompt palīdz Whisper nesagriezt pirmo vārdu
-                prompt="Latvian ERP software sales conversation.",
-            )
-
-        result = _call(audio_bytes, ext, clean_mime)
+        result = client.audio.transcriptions.create(
+            file=(f"audio.{ext}", audio_bytes, clean_mime),
+            model="whisper-large-v3-turbo",
+            language="lv",          # VIENMĒR latviski — nekad auto-detect
+            response_format="text",
+            prompt="Latviski: ",    # latvian prompt palīdz Whisper sākt pareizi
+        )
         text = result.strip() if isinstance(result, str) else (result.text or "").strip()
-
-        # Ja iegūtais teksts šķiet pārāk īss un neatbilst latviešu valodai —
-        # mēģina bez language=lv (auto detect) ar whisper-large-v3
-        if text and len(text.split()) <= 2:
-            try:
-                result2 = client.audio.transcriptions.create(
-                    file=(f"audio.{ext}", audio_bytes, clean_mime),
-                    model="whisper-large-v3",
-                    response_format="text",
-                )
-                text2 = result2.strip() if isinstance(result2, str) else (result2.text or "").strip()
-                if len(text2.split()) > len(text.split()):
-                    text = text2
-            except Exception:
-                pass
-
         return text or None
 
     except Exception as e:
