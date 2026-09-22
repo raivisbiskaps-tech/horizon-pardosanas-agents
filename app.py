@@ -1182,10 +1182,7 @@ def generate_tame_excel(messages: list, model_name: str) -> tuple[bytes, str]:
         row_height = max(MIN_HEIGHT, max_lines * LINE_HEIGHT)
         ws.row_dimensions[row_idx].height = row_height
 
-    # Iestata kolonnu platumu
-    for col_idx, width in COL_WIDTHS.items():
-        col_letter = openpyxl.utils.get_column_letter(col_idx)
-        ws.column_dimensions[col_letter].width = width
+    # Kolonnu platumi tiek ņemti no šablona — nekādas izmaiņas
 
     # Pievieno klienta info virsrakstā (1. rinda pirms tabulas)
     ws.insert_rows(1)
@@ -1498,31 +1495,27 @@ def main():
                         st.text(f"• {src}")
 
     # ── Čata ievade ───────────────────────────────────────────────────────────────
-    text_input = st.chat_input("Raksti vai ierunā jautājumu...")
+    text_input = st.chat_input("Raksti jautājumu...")
 
-    if "mic_counter" not in st.session_state:
-        st.session_state.mic_counter = 0
     if "processed_audio_id" not in st.session_state:
         st.session_state.processed_audio_id = None
 
-    audio_result = mic_button(reset_counter=st.session_state.mic_counter)
+    audio_value = st.audio_input("Ierunā jautājumu", key="audio_input_widget", label_visibility="collapsed")
 
     question = None
     if text_input:
         question = text_input
-    elif audio_result and audio_result.get("type") == "audio":
-        # Unikāls ID — garums + beigu baiti (WebM sākums ir identisks visiem ierakstiem!)
-        _d = audio_result["data"]
-        audio_id = f"{len(_d)}-{_d[-40:]}"
+    elif audio_value is not None:
+        audio_bytes = audio_value.read()
+        audio_id = str(len(audio_bytes)) + "-" + str(audio_bytes[-20:])
         if audio_id != st.session_state.processed_audio_id:
             st.session_state.processed_audio_id = audio_id
-            import base64 as _b64
-            audio_bytes = _b64.b64decode(audio_result["data"])
             with st.spinner("Atpazīstu runu..."):
-                question = transcribe_audio(audio_bytes, audio_result.get("mimeType", "audio/webm"))
-            st.session_state.mic_counter += 1
+                question = transcribe_audio(audio_bytes, "audio/wav")
             if not question:
                 st.warning("⚠️ Neizdevās atpazīt runu — mēģini vēlreiz.")
+            else:
+                st.toast(f"🎤 {question}", icon="🎤")
 
     if question:
         st.session_state.messages.append({"role": "user", "content": question})
@@ -1657,17 +1650,6 @@ def main():
             st.rerun()
 
         st.divider()
-
-        # ── DEBUG: ChromaDB avoti ──────────────────────────────────────────────
-        if st.button("🔍 Parādi avotus DB", use_container_width=True):
-            try:
-                res = collection.get(include=["metadatas"])
-                all_sources = sorted({m.get("source","?") for m in res["metadatas"]})
-                st.write(f"**{len(all_sources)} avoti:**")
-                for s in all_sources:
-                    st.caption(s)
-            except Exception as e:
-                st.error(f"Kļūda: {e}")
 
         st.divider()
 
