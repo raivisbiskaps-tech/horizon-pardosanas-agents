@@ -1503,14 +1503,16 @@ def main():
 
     # DEBUG — noņem pēc atkļūdošanas
     st.sidebar.markdown("**🔍 Mic debug:**")
-    st.sidebar.write("audio_result ir None?", audio_result is None)
-    if audio_result is not None:
-        st.sidebar.write("audio_result tips:", type(audio_result).__name__)
-        if isinstance(audio_result, dict):
-            st.sidebar.write("audio_result.type:", audio_result.get("type"))
-            st.sidebar.write("audio_result data garums:", len(audio_result.get("data", "")))
-        else:
-            st.sidebar.write("audio_result vērtība:", str(audio_result)[:200])
+    _ar = audio_result
+    st.sidebar.write("audio_result ir None?", _ar is None)
+    _aid = None
+    if isinstance(_ar, dict):
+        _aid = f"{len(_ar.get('data',''))}-{_ar.get('data','')[-40:]}"
+        st.sidebar.write("audio_result.type:", _ar.get("type"))
+        st.sidebar.write("audio data garums:", len(_ar.get("data", "")))
+    st.sidebar.write("audio_id:", _aid)
+    st.sidebar.write("processed_audio_id:", st.session_state.get("processed_audio_id"))
+    st.sidebar.write("dedup bloķē?", _aid is not None and _aid == st.session_state.get("processed_audio_id"))
     st.sidebar.write("mic_counter:", st.session_state.mic_counter)
 
     question = None
@@ -1520,16 +1522,24 @@ def main():
         _d = audio_result["data"]
         audio_id = f"{len(_d)}-{_d[-40:]}"
         if audio_id != st.session_state.processed_audio_id:
+            # Reģistrējam audio_id PIRMS transkripcijas, counter arī
             st.session_state.processed_audio_id = audio_id
-            import base64 as _b64
-            audio_bytes = _b64.b64decode(audio_result["data"])
-            with st.spinner("Atpazīstu runu..."):
-                question = transcribe_audio(audio_bytes, audio_result.get("mimeType", "audio/webm"))
             st.session_state.mic_counter += 1
-            if not question:
-                st.warning("⚠️ Neizdevās atpazīt runu — mēģini vēlreiz.")
-            else:
-                st.toast(f"🎤 {question}", icon="🎤")
+            st.info(f"🎤 Audio saņemts ({len(_d)} simboli) — transkribēju...")
+            try:
+                import base64 as _b64
+                audio_bytes = _b64.b64decode(_d)
+                mime = audio_result.get("mimeType", "audio/webm")
+                with st.spinner("Atpazīstu runu..."):
+                    question = transcribe_audio(audio_bytes, mime)
+                if not question:
+                    st.warning("⚠️ Neizdevās atpazīt runu — mēģini vēlreiz.")
+                else:
+                    st.toast(f"🎤 {question}", icon="🎤")
+            except Exception as _exc:
+                st.error(f"❌ Audio apstrādes kļūda: {_exc}")
+        else:
+            st.sidebar.info("ℹ️ Dedup: šis audio jau apstrādāts")
 
     if question:
         st.session_state.messages.append({"role": "user", "content": question})
