@@ -52,8 +52,8 @@ window.addEventListener('message', function(ev) {
     if (c !== _lastCounter) { _lastCounter = c; if (recording) stopRec(false); }
 });
 
-post({ type: 'streamlit:setFrameHeight', height: 36 });
 post({ type: 'streamlit:componentReady', apiVersion: 1 });
+post({ type: 'streamlit:setFrameHeight', height: 36 });
 
 /* ── Pozicionēšana ───────────────────────────────────────────────────── */
 var SZ = 36;
@@ -114,10 +114,17 @@ function startRec() {
         mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) chunks.push(e.data); };
         mediaRecorder.onstop = function() {
             stream.getTracks().forEach(function(t) { t.stop(); });
+            console.log('[mic] onstop fired, chunks:', chunks.length);
             var blob = new Blob(chunks, { type: mime });
+            console.log('[mic] blob size:', blob.size, 'type:', mime);
             var reader = new FileReader();
             reader.onloadend = function() {
-                setValue({ type: 'audio', data: reader.result.split(',')[1], mimeType: mime });
+                var b64 = reader.result.split(',')[1];
+                console.log('[mic] b64 length:', b64 ? b64.length : 0, '— sending setValue');
+                setValue({ type: 'audio', data: b64, mimeType: mime });
+            };
+            reader.onerror = function(e) {
+                console.error('[mic] FileReader error:', e);
             };
             reader.readAsDataURL(blob);
         };

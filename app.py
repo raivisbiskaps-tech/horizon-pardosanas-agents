@@ -1495,23 +1495,33 @@ def main():
                         st.text(f"• {src}")
 
     # ── Čata ievade ───────────────────────────────────────────────────────────────
-    text_input = st.chat_input("Raksti jautājumu...")
+    text_input = st.chat_input("Raksti vai ierunā jautājumu...")
 
+    if "mic_counter" not in st.session_state:
+        st.session_state.mic_counter = 0
     if "processed_audio_id" not in st.session_state:
         st.session_state.processed_audio_id = None
 
-    audio_value = st.audio_input("Ierunā jautājumu", key="audio_input_widget", label_visibility="collapsed")
+    audio_result = mic_button(reset_counter=st.session_state.mic_counter)
+
+    # DEBUG — noņem pēc atkļūdošanas
+    st.sidebar.write("🔍 audio_result:", audio_result)
+    st.sidebar.write("🔍 mic_counter:", st.session_state.mic_counter)
+    st.sidebar.write("🔍 processed_audio_id:", st.session_state.get("processed_audio_id"))
 
     question = None
     if text_input:
         question = text_input
-    elif audio_value is not None:
-        audio_bytes = audio_value.read()
-        audio_id = str(len(audio_bytes)) + "-" + str(audio_bytes[-20:])
+    elif audio_result and audio_result.get("type") == "audio":
+        _d = audio_result["data"]
+        audio_id = f"{len(_d)}-{_d[-40:]}"
         if audio_id != st.session_state.processed_audio_id:
             st.session_state.processed_audio_id = audio_id
+            import base64 as _b64
+            audio_bytes = _b64.b64decode(audio_result["data"])
             with st.spinner("Atpazīstu runu..."):
-                question = transcribe_audio(audio_bytes, "audio/wav")
+                question = transcribe_audio(audio_bytes, audio_result.get("mimeType", "audio/webm"))
+            st.session_state.mic_counter += 1
             if not question:
                 st.warning("⚠️ Neizdevās atpazīt runu — mēģini vēlreiz.")
             else:
