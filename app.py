@@ -255,17 +255,14 @@ def transcribe_audio(audio_bytes: bytes, mime_type: str = "audio/webm") -> str |
 
 
 # ── Mic pogas komponents ──────────────────────────────────────────────────────
-
-@st.cache_resource
-def _get_mic_button_fn():
-    import streamlit.components.v1 as _stc
-    path = os.path.join(BASE_DIR, "components", "mic_button")
-    return _stc.declare_component("mic_button", path=path)
+# declare_component jāizsauc VIENREIZ moduļa līmenī (nevis cache_resource iekšā)
+import streamlit.components.v1 as _stc_v1
+_MIC_BTN_PATH = os.path.join(BASE_DIR, "components", "mic_button")
+_mic_button_fn = _stc_v1.declare_component("mic_button", path=_MIC_BTN_PATH)
 
 
 def mic_button(reset_counter: int = 0) -> dict | None:
-    fn = _get_mic_button_fn()
-    return fn(reset_counter=reset_counter, key="mic_button", default=None)
+    return _mic_button_fn(reset_counter=reset_counter, key="mic_button", default=None)
 
 
 # ── RAG ───────────────────────────────────────────────────────────────────────
@@ -1505,9 +1502,16 @@ def main():
     audio_result = mic_button(reset_counter=st.session_state.mic_counter)
 
     # DEBUG — noņem pēc atkļūdošanas
-    st.sidebar.write("🔍 audio_result:", audio_result)
-    st.sidebar.write("🔍 mic_counter:", st.session_state.mic_counter)
-    st.sidebar.write("🔍 processed_audio_id:", st.session_state.get("processed_audio_id"))
+    st.sidebar.markdown("**🔍 Mic debug:**")
+    st.sidebar.write("audio_result ir None?", audio_result is None)
+    if audio_result is not None:
+        st.sidebar.write("audio_result tips:", type(audio_result).__name__)
+        if isinstance(audio_result, dict):
+            st.sidebar.write("audio_result.type:", audio_result.get("type"))
+            st.sidebar.write("audio_result data garums:", len(audio_result.get("data", "")))
+        else:
+            st.sidebar.write("audio_result vērtība:", str(audio_result)[:200])
+    st.sidebar.write("mic_counter:", st.session_state.mic_counter)
 
     question = None
     if text_input:
