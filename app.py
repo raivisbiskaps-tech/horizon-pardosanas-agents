@@ -1546,15 +1546,6 @@ def main():
     st.sidebar.write("dedup bloķē?", _aid is not None and _aid == st.session_state.get("processed_audio_id"))
     st.sidebar.write("mic_counter:", st.session_state.mic_counter)
 
-    # Pēdējā ieraksta atskaņošana
-    if st.session_state.get("last_audio_bytes"):
-        st.sidebar.markdown("---")
-        st.sidebar.markdown("**🔊 Pēdējais ieraksts:**")
-        st.sidebar.audio(
-            st.session_state.last_audio_bytes,
-            format=st.session_state.get("last_audio_mime", "audio/webm"),
-        )
-
     question = None
     if text_input:
         question = text_input
@@ -1582,6 +1573,15 @@ def main():
                 st.error(f"❌ Audio apstrādes kļūda: {_exc}")
         else:
             st.sidebar.info("ℹ️ Dedup: šis audio jau apstrādāts")
+
+    # Pēdējā ieraksta atskaņošana — renderē PĒC apstrādes, lai last_audio_bytes būtu iestatīts
+    if st.session_state.get("last_audio_bytes"):
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("**🔊 Pēdējais ieraksts:**")
+        st.sidebar.audio(
+            st.session_state.last_audio_bytes,
+            format=st.session_state.get("last_audio_mime", "audio/webm"),
+        )
 
     if question:
         st.session_state.messages.append({"role": "user", "content": question})
