@@ -104,18 +104,16 @@ var checkInterval = null;
 var silenceStart  = null;
 
 // ── Pre-warm mikrofona atļauja ─────────────────────────────────────────
-// Ielādējoties komponentei, pieprasa atļauju UN saglabā stream, lai pie
-// klikšķa ieraksts sākas uzreiz — bez 300-800ms getUserMedia aizkavēšanās.
-var _warmStream = null;
-
+// Ielādējoties komponentei, pieprasa atļauju un UZREIZ atbrīvo stream.
+// Pēc atļaujas piešķiršanas pārlūks to kešo — katrs nākamais getUserMedia
+// aizsauc ~10ms nevis 300-800ms. Nekad neglabājam stream starp ierakstiem
+// (tas izraisīja kļūdas uz 4.+ reizi).
 function _prewarm() {
-    if (_warmStream && _warmStream.active) return; // jau gatavs
     navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(function(s) { _warmStream = s; })
-        .catch(function() { _warmStream = null; });
+        .then(function(s) { s.getTracks().forEach(function(t) { t.stop(); }); })
+        .catch(function() {});
 }
 
-// Pirmais pre-warm nekavējoties; atkārtots pēc katra ieraksta
 setTimeout(_prewarm, 200);
 
 btn.addEventListener('click', function() {
@@ -123,20 +121,14 @@ btn.addEventListener('click', function() {
 });
 
 function startRec() {
-    // Izmanto priekšpieprašāto stream, vai pieprasa jaunu
-    var streamPromise = (_warmStream && _warmStream.active)
-        ? Promise.resolve(_warmStream)
-        : navigator.mediaDevices.getUserMedia({ audio: true });
-
-    _warmStream = null; // atbrīvo — pēc ieraksta pre-warms atkal
-
-    // Uzreiz rāda "ieraksta" stāvokli — pirms stream gatavs
     recording = true;
     btn.classList.add('rec');
     btn.style.opacity = '0.6';
     btn.title = 'Gatavo...';
 
-    streamPromise.then(function(stream) {
+    // Katru reizi iegūstam svaigu stream — atļauja jau ir kešota,
+    // tāpēc getUserMedia atgriežas ~10-50ms (nevis ~500ms pirmo reizi)
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
         chunks = [];
 
         var mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
